@@ -9,15 +9,15 @@
 # Global Definitions
 
 ## Params
-k_t = -1
-c_t = -1
+k_t = None
+c_t = None
 
 packing    = "cheetah"
 ntt_type   = "baseline"
 batch_size = 1
 poly_n     = 1024
 
-num_chiplets  = -1
+num_chiplets  = None
 
 # Processor
 cycle_time = 5     # In ns

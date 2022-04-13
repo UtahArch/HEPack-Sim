@@ -60,6 +60,7 @@ class PE_Basic:
             self.twicoef = Cache("TwiCoef ", defs.twicoef_size, defs.twicoef_read, defs.twicoef_write)
         
         self.ksh_file = Cache("KSH File", defs.wt_file_size, defs.ksh_file_read, defs.ksh_file_write)
+        # The PSUM File is actually a collection of psum_file_num files but we represent it as 1 file and do the nessacery scaling later
         self.psum_file = Cache("PSUM File", defs.if_file_size, defs.psum_file_read, defs.psum_file_write)
 
         self.adds = ALUUnit("ADD", defs.mac_num, defs.add_exec_time)
@@ -71,6 +72,9 @@ class PE_Basic:
 
         self.phops = 0
         self.chops = 0
+
+        self.shift = 0
+        self.permt = 0
 
     # Functions to print structure and stats
     def print_structure(self):
@@ -179,6 +183,57 @@ class PE_Basic:
         self.phops  += phops
         self.chops  += chops
 
+    def update_psum_rotate(self, cycles):
+
+        self.psum_file.stats_shifts += 1
+        self.psum_file.stats_accesses += 2
+
+        self.permt += 1
+        self.cycles += cycles
+
+    def update_psum_wt_rotate(self, cycles):
+
+        self.psum_file.stats_shifts += 1
+        self.psum_file.stats_accesses += 2
+
+        self.wt_file.stats_shifts += 1
+        self.wt_file.stats_accesses += 2
+
+        self.permt += 2
+        self.cycles += CYCLE_COUNT
+    
+    def update_wt_rotate(self):
+        
+        self.wt_file.stats_shifts += 1
+        self.wt_file.stats_accesses += 2
+
+        self.shift += 1
+        self.cycles += CYCLE_COUNT
+
+    # TODO: Check if this is okay or not
+    def update_ksh_psum(self, cycles, iters):
+        # We MAC iters KSH with PSUMs and then accumulate iter times
+        self.ksh_file.stats_accesses += self.ksh_file.size * iters
+        self.psum_file.stats_accesses += 2*self.psum_file.size * iters
+        self.muls.stats_accesses += self.muls.num * iters
+        self.adds.stats_accesses += 2 * self.adds.num * iters
+
+        self.shift += 1
+        self.cycles += cycles
+        self.calls += 1
+
+    # TODO: Check if this is okay or not
+    def update_ksh_if(self, cycles):
+        # We MAC iters KSH with IF
+        self.ksh_file.stats_accesses += self.ksh_file.size
+        self.if_file.stats_accesses += 2*self.if_file.size
+        self.muls.stats_accesses += self.muls.num
+        self.adds.stats_accesses += self.adds.num
+
+        self.permt += 1
+        self.cycles += cycles
+        self.calls += 1
+
 
 # Classes for Stats
 
@@ -215,4 +270,17 @@ class KSH_Stats(PE_Basic):
         print("=== KSH Stats ===")
         print("Cycles\t\t:\t{}".format(self.cycles))
         print("Calls\t\t:\t{}".format(self.calls))
+        self.print_pe_stats()
+
+class ROT_Stats(PE_Basic):
+    
+    def __init__(self):
+        PE_Basic.__init__(self)
+
+    def print_rot_stats(self):
+        print("=== ROT Stats ===")
+        print("Cycles\t\t:\t{}".format(self.cycles))
+        print("Calls\t\t:\t{}".format(self.calls))
+        print("Total Shifts       :\t{}".format(self.shift))
+        print("Total Permutations :\t{}".format(self.permt))
         self.print_pe_stats()

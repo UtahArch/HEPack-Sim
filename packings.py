@@ -28,11 +28,12 @@ class Chiplet(elements.PE_Basic):
         print defs.k_t, defs.c_t, defs.packing, defs.ntt_type, defs.batch_size, defs.poly_n, defs.num_chiplets
         print("=== Stats ===")
         print("Total Cycles Taken :\t{}".format(self.pe_array.cycles))
-        print("Total PE      Hops :\t{}".format(self.pe_array.phops))
+        print("Total PE Hops      :\t{}".format(self.pe_array.phops))
         print("Total Chiplet Hops :\t{}".format(self.pe_array.chops))
         print("Total PHOP Time    :\t{}".format(self.pe_array.phops * defs.phop_time))
         print("Total CHOP Time    :\t{}".format(self.pe_array.chops * defs.chop_time))
-
+        print("Total Shifts       :\t{}".format(self.pe_array.shift))
+        print("Total Permutations :\t{}".format(self.pe_array.permt))
         print("=== Chiplet Stats ===")
         self.pe_array.print_pe_stats()
         self.if_l2_cache.print_stats()
@@ -44,7 +45,7 @@ class Chiplet(elements.PE_Basic):
         self.pe_array.ksh_stats.print_ksh_stats()
 
 
-    # Run Cheetah for all wts along the channel step
+    # Run Cheetah for all wts along the channel step that are packed
     def run_cheetah(self, runs):
         
         # return
@@ -69,3 +70,77 @@ class Chiplet(elements.PE_Basic):
             # Access the ksh for the next rotation
             # TODO: What is the L2 cache size required for this?
             self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size
+
+    # Run Cheetah for all wts and ifs that are packed
+    def run_epic(self, runs):
+
+        for i in range(runs):
+            # Perform mult
+            self.pe_array.op_mul_if_wt_ksh()
+            # return
+
+            # Rotate PSUM and wts for next mult
+            # TODO: Is this okay?
+            self.pe_array.op_ntt_util('psum')
+            # return
+            self.pe_array.op_ntt_util('wt')
+            # return
+            self.pe_array.op_psum_wt_rotate()
+            self.pe_array.op_ntt_util('psum')
+            self.pe_array.op_ntt_util('wt')
+
+            # Access the ksh for the next rotation
+            # TODO: What is the L2 cache size required for this?
+            self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size
+
+    
+    # Run Hyena for all wts and ifs that are packed
+    def run_hyena_k(self):
+        
+        for k in range(defs.k_t):
+            # Perform mult
+            self.pe_array.op_mul_if_wt()
+
+            # Rotate wts with an RSCt stride
+            if self.ntt_choice <= 0:
+                # print self.pe_array.cycles
+                temp = self.pe_array.op_ntt_util('wt', self.ntt_choice)
+                # print self.pe_array.cycles, temp
+                temp = self.pe_array.op_wt_rotate()
+                # print self.pe_array.cycles, temp
+                temp = self.pe_array.op_ntt_util('wt', self.ntt_choice)
+                # print self.pe_array.cycles, temp
+            else:
+                self.pe_array.op_ntt_util('wt', self.ntt_choice)
+
+            return
+
+    # Collate all psums present in it
+    def run_hyena_psum_collect(self, iters):
+        if self.ntt_choice <= 0:
+            temp = self.pe_array.op_ntt_util('psum', self.ntt_choice)
+            # print self.pe_array.cycles, temp
+            self.pe_array.op_ksh_psum(iters)
+            # print self.pe_array.cycles, temp
+            temp = self.pe_array.op_ntt_util('psum', self.ntt_choice)
+        else:
+            temp = self.pe_array.op_ntt_util('psum', 0)
+            # print self.pe_array.cycles, temp
+            self.pe_array.op_ksh_psum(iters)
+            # print self.pe_array.cycles, temp
+            temp = self.pe_array.op_ntt_util('psum', 0)
+
+    # Permute the IF
+    def run_hyena_permute_if(self):
+        if self.ntt_choice <= 0:
+            temp = self.pe_array.op_ntt_util('if', self.ntt_choice)
+            # print self.pe_array.cycles, temp
+            self.pe_array.op_ksh_if()
+            # print self.pe_array.cycles, temp
+            temp = self.pe_array.op_ntt_util('if', self.ntt_choice)
+        else:
+            temp = self.pe_array.op_ntt_util('if', 0)
+            # print self.pe_array.cycles, temp
+            self.pe_array.op_ksh_if()
+            # print self.pe_array.cycles, temp
+            temp = self.pe_array.op_ntt_util('if', 0)

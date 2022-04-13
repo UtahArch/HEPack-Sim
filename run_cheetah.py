@@ -38,7 +38,7 @@ with open("Resnet50_model.m") as fin:
             W  = (param['R'], param['S'], param['C'], param['K'])
             
             # Decide Params
-            ## To decide C_t and XY_t
+            ## To decide C_t and XY_t - IF packing
             C_t = 1
             XY = IF[0] * IF[1]
 

@@ -19,9 +19,11 @@ class PE(elements.PE_Basic):
         self.ntt_stats = elements.NTT_Stats()
         self.mul_stats = elements.MUL_Stats()
         self.ksh_stats = elements.KSH_Stats()
+        self.rot_stats = elements.ROT_Stats()
 
     ## Functions performed in a PE
 
+    # TODO: Math is followed by NTT not anything else, can we really pipeline it?
     # Multiply IF with Wts and do all that stuff
     # 
     #   PE Exec                     Order
@@ -74,34 +76,91 @@ class PE(elements.PE_Basic):
 
         return CYCLE_COUNT
 
-    # Rotate Psums during muls and send last B and recieve new 1st B
+    # Rotate Psums after muls and send last B and recieve new 1st B
     def op_psum_rotate(self):
 
-        self.psum_file.stats_shifts += 1
-        self.psum_file.stats_accesses += 2
-
+        # In worst case the value has to go through 2 hops
         if defs.num_chiplets == 1:
-            CYCLE_COUNT = defs.phop_time
+            CYCLE_COUNT = 2 * defs.phop_time
         else:
-            CYCLE_COUNT = defs.chop_time
+            CYCLE_COUNT = 2 * defs.chop_time
 
         self.cycles += CYCLE_COUNT
 
+        self.update_psum_rotate(CYCLE_COUNT)
+        self.rot_stats.update_psum_rotate(CYCLE_COUNT)
+
         return CYCLE_COUNT
+
+    # Rotate Psums and wts after muls and send last B and recieve new 1st B
+    def op_psum_wt_rotate(self):
+
+        # In worst case the value has to go through 2 hops
+        if defs.num_chiplets == 1:
+            CYCLE_COUNT = 2 * defs.phop_time
+        else:
+            CYCLE_COUNT = 2 * defs.chop_time
+
+        self.update_psum_wt_rotate(CYCLE_COUNT)
+        self.rot_stats.update_psum_wt_rotate(CYCLE_COUNT)
+
+        return CYCLE_COUNT
+
+    # Rotate Psums and wts after muls and send last B and recieve new 1st B
+    def op_wt_rotate(self):
+
+        # In worst case the value has to go through 2 hops
+        if defs.num_chiplets == 1:
+            CYCLE_COUNT = 2 * defs.phop_time
+        else:
+            CYCLE_COUNT = 2 * defs.chop_time
+
+        self.update_wt_rotate(CYCLE_COUNT)
+        self.rot_stats.update_wt_rotate(CYCLE_COUNT)
+
+        return CYCLE_COUNT
+
+    # TODO: Check if pipline is correct
+    # TODO: Why do we need KSH once NTT has been applied?
+    # Decode PSUM then rotate and add
+    def op_ksh_psum(self, iters):
+        # Since there are iter MACs followed by accumulates
+        CYCLE_COUNT = iters * (max(self.muls.exec_time, self.psum_file.write_time, self.psum_file.read_time, self.wt_file.read_time) + self.adds.exec_time)
+
+        self.update_ksh_psum(CYCLE_COUNT, iters)
+        self.ksh_stats.update_ksh_psum(CYCLE_COUNT, iters)
+    
+    # Permute KSH
+    def op_ksh_if(self):
+        CYCLE_COUNT = max(self.muls.exec_time, self.if_file.write_time, self.if_file.read_time, self.ksh_file.read_time)
+
+        self.update_ksh_if(CYCLE_COUNT)
+        self.ksh_stats.update_ksh_if(CYCLE_COUNT)
 
     
     # Choose which ntt to do
-    def op_ntt_util(self, mode):
-        if defs.ntt_type == "baseline":
-            return self.op_ntt_baseline(mode)
-        elif defs.ntt_type == "f1":
-            return self.op_ntt_f1(mode)
-        elif defs.ntt_type == "opt":
-            return self.op_ntt_opt(mode)
+    # Choice = -1 : Do whatever is mention in defs.ntt_type (if opt, do it with a stride of 1)
+    # Choice =  0 : Do F1
+    # Choice >  0 : Do opt with a stride of choice
+    def op_ntt_util(self, mode, choice = -1):
+
+        if choice == -1:
+            if defs.ntt_type == "baseline":
+                return self.op_ntt_baseline(mode)
+            elif defs.ntt_type == "f1":
+                return self.op_ntt_f1(mode)
+            elif defs.ntt_type == "opt":
+                return self.op_ntt_opt(mode, 1)
+            else:
+                print "Error op_ntt_util 1", defs.ntt_type
+                exit()
+        elif choice == 0:
+                return self.op_ntt_f1(mode)
+        elif choice > 0:
+            return self.op_ntt_opt(mode, choice)
         else:
-            print "Error op_ntt_util 1", defs.ntt_type
+            print "Error op_ntt_util 2", choice
             exit()
-        
     
     # Run NTT on the file passed through
     # TODO: Explain it somehow here?
@@ -162,7 +221,7 @@ class PE(elements.PE_Basic):
     # Run NTT on the file passed through
     # Check transpose and 2 time calling
     # Root of n NTTs on Root of n values + Transpose + Root of n NTTs on Root of n values
-    def op_ntt_f1(self, mode):
+    def op_ntt_f1(self, mode, param = -1):
         temp_cycles = 0
         temp_steps = 0
         temp_chops = 0
@@ -209,18 +268,19 @@ class PE(elements.PE_Basic):
                 temp_cycles += defs.chop_time + max(self.twiddle.write_time, reg_file.write_time)
                 temp_chops += 1
 
-            print("{} \t {} \t {} \t {} {} {}".format(num_vals, temp_steps, pe_diff, temp_cycles, temp_phops, temp_chops))
+            # print("{} \t {} \t {} \t {} {} {}".format(num_vals, temp_steps, pe_diff, temp_cycles, temp_phops, temp_chops))
 
-        # This will be called twice
-        self.update_ntt(temp_cycles * 2, mode, temp_steps * 2, temp_chops * 2, temp_phops * 2)
-        self.ntt_stats.update_ntt(temp_cycles * 2, mode, temp_steps * 2, temp_chops * 2, temp_phops * 2)
+        if param == -1:
+            # This will be called twice
+            self.update_ntt(temp_cycles * 2, mode, temp_steps * 2, temp_chops * 2, temp_phops * 2)
+            self.ntt_stats.update_ntt(temp_cycles * 2, mode, temp_steps * 2, temp_chops * 2, temp_phops * 2)
 
-        return temp_cycles
+        return temp_cycles * 2
 
     # Run optimised NTT
     # (Twiddle Hint * Wts) + Twiddle Coeff -> Wts happens c_t times
     # TODO: What are the Hops ?
-    def op_ntt_opt(self, mode):
+    def op_ntt_opt(self, mode, stride, param = -1):
 
         if mode == 'psum':
             reg_file = self.psum_file
@@ -232,18 +292,27 @@ class PE(elements.PE_Basic):
             print "Error op_ntt_opt 1"
             exit()
 
-        temp_steps = defs.c_t
+        temp_steps = defs.c_t * stride
 
         if defs.num_chiplets == 1:
-            temp_cycles = (max(self.twiddle.read_time, self.twicoef.read_time, reg_file.read_time) + self.muls.exec_time + defs.phop_time) * defs.c_t
-            self.update_ntt(temp_cycles, mode, temp_steps, 0, 1)
-            self.ntt_stats.update_ntt(temp_cycles, mode, temp_steps, 0, 1)
+            temp_cycles = (max(self.twiddle.read_time, self.twicoef.read_time, reg_file.read_time) + self.muls.exec_time + defs.phop_time) * temp_steps
+            if param == -1:
+                self.update_ntt(temp_cycles, mode, temp_steps, 0, 1)
+                self.ntt_stats.update_ntt(temp_cycles, mode, temp_steps, 0, 1)
         elif defs.num_chiplets > 1:
-            temp_cycles = (max(self.twiddle.read_time, self.twicoef.read_time, reg_file.read_time) + self.muls.exec_time + defs.chop_time) * defs.c_t
-            self.update_ntt(temp_cycles, mode, temp_steps, 1, 0)
-            self.ntt_stats.update_ntt(temp_cycles, mode, temp_steps, 1, 0)
+            temp_cycles = (max(self.twiddle.read_time, self.twicoef.read_time, reg_file.read_time) + self.muls.exec_time + defs.chop_time) * temp_steps
+            if param == -1:
+                self.update_ntt(temp_cycles, mode, temp_steps, 1, 0)
+                self.ntt_stats.update_ntt(temp_cycles, mode, temp_steps, 1, 0)
         else:
             print "Error op_ntt_opt 2"
             exit()
 
+        if param == -1:
+            # Since this acts as a shift
+            # TODO: This is not refelcted in stat collections
+            reg_file.stats_shifts += 1
+            reg_file.stats_accesses += 2
+            self.shift += 1
+        # print max(self.twiddle.read_time, self.twicoef.read_time, reg_file.read_time), self.muls.exec_time,  defs.phop_time, "*", temp_steps, temp_cycles
         return temp_cycles

@@ -37,7 +37,7 @@ with open("Resnet50_model.m") as fin:
             IF = (param['X'], param['Y'], param['C'])
             W  = (param['R'], param['S'], param['C'], param['K'])
 
-            # To decide C_t and XY_t
+            # To decide C_t and XY_t - IF Packing
             C_t = 1
             XY = IF[0] * IF[1]
 
@@ -53,7 +53,7 @@ with open("Resnet50_model.m") as fin:
 
             assert ( C_t * W[0] * W[1] <= defs.wt_file_size * defs.num_pe_x * defs.num_pe_y)
             
-            # To decide K_t based on C_t
+            # To decide K_t based on C_t - Wt Packing
             K_t = 1
             while K_t < W[3]:
                 if K_t * C_t * W[0] * W[1] <= defs.wt_file_size * defs.num_pe_x * defs.num_pe_y:
@@ -111,16 +111,16 @@ with open("Resnet50_model.m") as fin:
                         main_chiplet.pe_array.wt_file.stats_accesses += main_chiplet.pe_array.wt_file.size
 
                         # Number of rotations = R S C_t K_t / C_t
-                        break
                         main_chiplet.run_epic(W[1] * W[0] * K_t)
+                        # break
                     
                     # Flush PSUM to memory
                     main_chiplet.pe_array.psum_file.stats_accesses += main_chiplet.pe_array.psum_file.size
                     main_chiplet.memory.stats_accesses += main_chiplet.pe_array.psum_file.size
-                    break
+                    # break
 
 
-                break
+                # break
 
 
             main_chiplet.print_stats_console(IF, W)
