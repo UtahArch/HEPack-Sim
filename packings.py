@@ -10,6 +10,7 @@ import elements
 import defs
 import funcs
 import math
+import sys
 
 # Main Class
 class Chiplet(elements.PE_Basic):
@@ -59,8 +60,8 @@ class Chiplet(elements.PE_Basic):
         # print("Total Chiplet Hops :\t{}".format(self.pe_array.chops))
         # print("Total PHOP Time    :\t{}".format(self.pe_array.phops * defs.phop_time))
         # print("Total CHOP Time    :\t{}".format(self.pe_array.chops * defs.chop_time))
-        print("Total Shifts       :\t{}".format(self.pe_array.shift))
-        print("Total Permutations :\t{}".format(self.pe_array.permt))
+        # print("Total Shifts       :\t{}".format(self.pe_array.shift))
+        # print("Total Permutations :\t{}".format(self.pe_array.permt))
         print("=== Chiplet Stats ===")
         # self.pe_array.print_pe_stats()
         self.if_l2_cache.print_stats()
@@ -73,11 +74,20 @@ class Chiplet(elements.PE_Basic):
         self.pe_array.ksh_stats.print_ksh_stats()
         self.pe_array.rot_stats.print_rot_stats()
 
+    def print_stats_file(self, IF, W, name):
+        output_path = "data/{}_{}_{}/{}_{}_{}_{}_{}_{}_{}.data".format(defs.packing, defs.ntt_type, defs.arch, name, IF[0], IF[1], W[0], W[1], W[2], W[3])
+        print output_path
+
+        stout_save = sys.stdout
+        sys.stdout = open(output_path, 'w')
+        self.print_stats_console(IF, W)
+        sys.stdout.close()
+        sys.stdout = stout_save
+    
+
     # Cheetah
 
     ## Calc Stages for cheetah
-    # TODO: Add for baseline ntt case
-    # TODO: Rotation and Tr are different right? RIGHT? op_ntt_f1_permute_cycles vs op_psum_rotate_cycle
     def setup_cheetah(self):
         # Pipeline:
         # MUL
@@ -89,24 +99,22 @@ class Chiplet(elements.PE_Basic):
         # TR2
         # NI2
         # KSH
-
-        # TODO: op_psum_rotate_cycles and op_ntt_f1_permute_cycles are the same thing
         self.stages = [
             ("MUL",self.pe_array.op_mul_if_wt_cycles()),
             ("NT1",self.pe_array.op_ntt_f1_cycles("psum")),
-            ("TR1",self.pe_array.op_ntt_f1_permute_cycles("psum")),
+            ("TR1",self.pe_array.op_psum_rotate_cycles()),
             ("NT2",self.pe_array.op_ntt_f1_cycles("psum")),
             ("ROT",self.pe_array.op_psum_rotate_cycles()),
             ("NI1",self.pe_array.op_ntt_f1_cycles("psum")),
-            ("TR2",self.pe_array.op_ntt_f1_permute_cycles("psum")),
+            ("TR2",self.pe_array.op_psum_rotate_cycles()),
             ("NI2",self.pe_array.op_ntt_f1_cycles("psum")),
             ("KSH",self.pe_array.op_ksh_psum_cycles())
         ]
 
         defs.cycle_time = max([x[1] for x in self.stages])
         
-        print self.stages
-        print defs.cycle_time
+        # print self.stages
+        # print defs.cycle_time
 
     ## Run Cheetah for all wts along the channel step that are packed
     def run_cheetah(self, runs):
@@ -124,11 +132,11 @@ class Chiplet(elements.PE_Basic):
 
             self.pe_array.op_mul_if_wt()
             self.pe_array.op_ntt_f1("psum")
-            self.pe_array.op_ntt_f1_permute("psum")
+            self.pe_array.op_psum_rotate()
             self.pe_array.op_ntt_f1("psum")
             self.pe_array.op_psum_rotate()
             self.pe_array.op_ntt_f1("psum")
-            self.pe_array.op_ntt_f1_permute("psum")
+            self.pe_array.op_psum_rotate()
             self.pe_array.op_ntt_f1("psum")
             self.pe_array.op_ksh_psum()
             
@@ -156,28 +164,26 @@ class Chiplet(elements.PE_Basic):
         # T2P
         # I2P
         # KSH
-        
-        # TODO: op_psum_rotate_cycles and op_ntt_f1_permute_cycles are the same thing
         self.stages = [
             ("I1W",self.pe_array.op_ntt_f1_cycles("wt")),
-            ("T1W",self.pe_array.op_ntt_f1_permute_cycles("wt")),
+            ("T1W",self.pe_array.op_wt_rotate_cycles()),
             ("I2W",self.pe_array.op_ntt_f1_cycles("wt")),
             ("ROW",self.pe_array.op_wt_rotate_cycles()),
             ("MUL",self.pe_array.op_mul_if_wt_cycles()),
             ("N1P",self.pe_array.op_ntt_f1_cycles("psum")),
-            ("T1P",self.pe_array.op_ntt_f1_permute_cycles("psum")),
+            ("T1P",self.pe_array.op_psum_rotate_cycles()),
             ("N2P",self.pe_array.op_ntt_f1_cycles("psum")),
             ("ROP",self.pe_array.op_psum_rotate_cycles()),
             ("I1P",self.pe_array.op_ntt_f1_cycles("psum")),
-            ("T2P",self.pe_array.op_ntt_f1_permute_cycles("psum")),
+            ("T2P",self.pe_array.op_psum_rotate_cycles()),
             ("I2P",self.pe_array.op_ntt_f1_cycles("psum")),
             ("KSH",self.pe_array.op_ksh_psum_cycles())
         ]
         
         defs.cycle_time = max([x[1] for x in self.stages])
         
-        print self.stages
-        print defs.cycle_time
+        # print self.stages
+        # print defs.cycle_time
         
     
     ## Run EPIC for all wts and ifs that are packed
@@ -187,16 +193,16 @@ class Chiplet(elements.PE_Basic):
             self.pipeline_counts += 1
 
             self.pe_array.op_ntt_f1("wt")
-            self.pe_array.op_ntt_f1_permute("wt")
+            self.pe_array.op_wt_rotate()
             self.pe_array.op_ntt_f1("wt")
             self.pe_array.op_wt_rotate()
             self.pe_array.op_mul_if_wt()
             self.pe_array.op_ntt_f1("psum")
-            self.pe_array.op_ntt_f1_permute("psum")
+            self.pe_array.op_psum_rotate()
             self.pe_array.op_ntt_f1("psum")
             self.pe_array.op_psum_rotate()
             self.pe_array.op_ntt_f1("psum")
-            self.pe_array.op_ntt_f1_permute("psum")
+            self.pe_array.op_psum_rotate()
             self.pe_array.op_ntt_f1("psum")
             self.pe_array.op_ksh_psum()
 
@@ -215,7 +221,7 @@ class Chiplet(elements.PE_Basic):
         
         # Check if shifting RSC_t times for NTT is better than using F1 NTT (in case defs.ntt_type is opt)
         self.ntt_choice = 'f1'
-        f1_cost  = 2*self.pe_array.op_ntt_f1_cycles("wt")+2*self.pe_array.op_ntt_f1_permute_cycles("wt")
+        f1_cost  = 2*self.pe_array.op_ntt_f1_cycles("wt")+2*self.pe_array.op_wt_rotate_cycles()
         if defs.ntt_type == 'opt':
             opt_cost = self.pe_array.op_ntt_opt_cycles("wt", rsct)
 
@@ -231,14 +237,12 @@ class Chiplet(elements.PE_Basic):
             # MUL
             self.stages = [
                 ("I1W",self.pe_array.op_ntt_f1_cycles("wt")),
-                ("T1W",self.pe_array.op_ntt_f1_permute_cycles("wt")),
+                ("T1W",self.pe_array.op_wt_rotate_cycles()),
                 ("I2W",self.pe_array.op_ntt_f1_cycles("wt")),
                 ("ROW",self.pe_array.op_wt_rotate_cycles()),
                 ("MUL",self.pe_array.op_mul_if_wt_cycles()),
             ]
         else:
-            # TODO: Is there an extra access that I have to make? Yes for c1, essentially double wt accesses from memory
-            # TODO: Doing OPT NTT is not actually a shift is it? ==> PERMT will have an energy cost, but shift won't (only in psum accumulate)
             # Pipeline:
             # I1W
             # MUL
@@ -262,11 +266,11 @@ class Chiplet(elements.PE_Basic):
             # KSH - RSC_t times (due to NTT Property) TODO: Confirm why this can be done again, Also as we are doing it on 1 value can that be exploited?
             self.seq = [
                 ("N1P",self.pe_array.op_ntt_f1_cycles("psum")),
-                ("T1P",self.pe_array.op_ntt_f1_permute_cycles("psum")),
+                ("T1P",self.pe_array.op_psum_rotate_cycles()),
                 ("N2P",self.pe_array.op_ntt_f1_cycles("psum")),
                 ("ROP",self.pe_array.op_psum_rotate_cycles(rsct)),
                 ("I1P",self.pe_array.op_ntt_f1_cycles("psum")),
-                ("T2P",self.pe_array.op_ntt_f1_permute_cycles("psum")),
+                ("T2P",self.pe_array.op_psum_rotate_cycles()),
                 ("I2P",self.pe_array.op_ntt_f1_cycles("psum")),
                 # TODO: /defs.num_muls on this value
                 ("KSH",self.pe_array.op_ksh_psum_cycles(rsct)),
@@ -277,7 +281,7 @@ class Chiplet(elements.PE_Basic):
             # NTT -> RSCt pipeline of OPNTT-KSH
             self.seq = [
                 ("N1P",self.pe_array.op_ntt_f1_cycles("psum"), 1),
-                ("T1P",self.pe_array.op_ntt_f1_permute_cycles("psum"), 1),
+                ("T1P",self.pe_array.op_psum_rotate_cycles(), 1),
                 ("N2P",self.pe_array.op_ntt_f1_cycles("psum"), 1),
                 ("ONT",self.pe_array.op_ntt_opt_cycles("psum"), rsct),
                 ("KSH",self.pe_array.op_ksh_psum_cycles(), rsct),
@@ -289,11 +293,11 @@ class Chiplet(elements.PE_Basic):
         # IF Permutation is a separate sequence
         self.seq2 = [
             ("N1I",self.pe_array.op_ntt_f1_cycles("if")),
-            ("T1I",self.pe_array.op_ntt_f1_permute_cycles("if")),
+            ("T1I",self.pe_array.op_if_rotate_cycles()),
             ("N2I",self.pe_array.op_ntt_f1_cycles("if")),
             ("ROI",self.pe_array.op_if_rotate_cycles()),
             ("I1I",self.pe_array.op_ntt_f1_cycles("if")),
-            ("T2I",self.pe_array.op_ntt_f1_permute_cycles("if")),
+            ("T2I",self.pe_array.op_if_rotate_cycles()),
             ("I2I",self.pe_array.op_ntt_f1_cycles("if")),
             ("KSH",self.pe_array.op_ksh_if_cycles()),
         ]
@@ -301,9 +305,9 @@ class Chiplet(elements.PE_Basic):
         self.seq2_cost = len(self.seq2)
 
 
-        print self.stages
-        print self.seq
-        print self.seq2
+        # print self.stages
+        # print self.seq
+        # print self.seq2
 
         # Check if psum collection will cause stalls to happen
         if float(C)*defs.k_t/defs.c_t > self.seq_cost:
@@ -321,10 +325,10 @@ class Chiplet(elements.PE_Basic):
             self.seq2stall = max(0, self.seq2_cost - (float(C)*defs.k_t/defs.c_t - self.seq_cost))
 
 
-        if defs.ntt_type == 'opt':
-            print defs.cycle_time, "\t", self.seq_cost, self.seq2_cost, "\t", self.seq_stall, self.seq2stall, "\t", self.ntt_choice, f1_cost, opt_cost
-        else:
-            print defs.cycle_time, "\t", self.seq_cost, self.seq2_cost, "\t", self.seq_stall, self.seq2stall, "\t", self.ntt_choice, f1_cost
+        # if defs.ntt_type == 'opt':
+        #     print defs.cycle_time, "\t", self.seq_cost, self.seq2_cost, "\t", self.seq_stall, self.seq2stall, "\t", self.ntt_choice, f1_cost, opt_cost
+        # else:
+        #     print defs.cycle_time, "\t", self.seq_cost, self.seq2_cost, "\t", self.seq_stall, self.seq2stall, "\t", self.ntt_choice, f1_cost
 
     # Run Hyena for all wts and ifs that are packed
     def run_hyena_k(self):
@@ -332,9 +336,11 @@ class Chiplet(elements.PE_Basic):
         for k in range(defs.k_t):
             self.pipeline_counts += 1
 
+            # TODO: Is there an extra access that I have to make? Yes for c1, essentially double wt accesses from memory
+
             if self.ntt_choice != 'opt':
                 self.pe_array.op_ntt_f1("wt")
-                self.pe_array.op_ntt_f1_permute("wt")
+                self.pe_array.op_wt_rotate()
                 self.pe_array.op_ntt_f1("wt")
                 self.pe_array.op_wt_rotate()
                 self.pe_array.op_mul_if_wt()
@@ -350,16 +356,19 @@ class Chiplet(elements.PE_Basic):
         
         if self.ntt_choice != 'opt':
             self.pe_array.op_ntt_f1("psum")
-            self.pe_array.op_ntt_f1_permute("psum")
+            self.pe_array.op_psum_rotate()
             self.pe_array.op_ntt_f1("psum")
             self.pe_array.op_psum_rotate(rsct)
             self.pe_array.op_ntt_f1("psum")
-            self.pe_array.op_ntt_f1_permute("psum")
+            self.pe_array.op_psum_rotate()
             self.pe_array.op_ntt_f1("psum")
-            self.pe_array.op_ksh_psum(rsct)
+            self.pe_array.op_ksh_psum(rsct)    
+            # TODO: Confirm why this can be done again, Also as we are doing it on 1 value can that be exploited?
+            #       Will there be the same number of accesses or will it be a little less?
+            #       How can that be optimised for the next case? Or can it not be done for that?
         else:
             self.pe_array.op_ntt_f1("psum")
-            self.pe_array.op_ntt_f1_permute("psum")
+            self.pe_array.op_psum_rotate()
             self.pe_array.op_ntt_f1("psum")
             for _ in range(rsct):
                 self.pe_array.op_ntt_opt("psum")
@@ -369,20 +378,17 @@ class Chiplet(elements.PE_Basic):
         
 
     # Permute the IF
-    # TODO: Discuss stalls for this
     def run_hyena_permute_if(self):
-        self.pe_array.op_ntt_f1("if")
-        self.pe_array.op_ntt_f1_permute("if")
         self.pe_array.op_ntt_f1("if")
         self.pe_array.op_if_rotate()
         self.pe_array.op_ntt_f1("if")
-        self.pe_array.op_ntt_f1_permute("if")
+        self.pe_array.op_if_rotate()
+        self.pe_array.op_ntt_f1("if")
+        self.pe_array.op_if_rotate()
         self.pe_array.op_ntt_f1("if")
         self.pe_array.op_ksh_if()
 
         self.cycles += self.seq2stall
 
     def calc_time_hyena(self):
-        print self.cycles
         self.cycles += self.pipeline_counts + len(self.stages)
-        print self.cycles

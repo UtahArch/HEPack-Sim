@@ -11,7 +11,10 @@ import packings
 import sys
 import os
 
-os.system('clear')
+console_print = False
+
+if console_print:
+    os.system('clear')
 
 ntttype  = sys.argv[1]
 arch     = sys.argv[2]
@@ -19,6 +22,7 @@ poly_n   = int(sys.argv[3])
 num_muls = int(sys.argv[4])
 batch    = 1
 
+done_params = set()
 
 with open("Resnet50_model.m") as fin:
     for line in fin.readlines():
@@ -26,15 +30,22 @@ with open("Resnet50_model.m") as fin:
             name = line.split()[1]
         elif "Dimensions" in line:
             param = {}
-            # line = "Dimensions { K: 128, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
-            line = "Dimensions { K: 512, C: 512, R: 3, S: 3, Y: 7, X: 7 }"
-            # line = "Dimensions { K: 64, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
+            if console_print:
+                # line = "Dimensions { K: 128, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
+                line = "Dimensions { K: 512, C: 512, R: 3, S: 3, Y: 7, X: 7 }"
+                # line = "Dimensions { K: 64, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
+            
+            if line in done_params:
+                continue
+            else:
+                done_params.add(line)
             
             temp = line.split("{")[1].split("}")[0].split(",")
             for t in temp:
                 t = [x.strip() for x in t.split(":")]
                 param[t[0]] = int(t[1])
-            print name, param
+            if console_print:
+                print name, param
 
             IF = (param['X'], param['Y'], param['C'])
             W  = (param['R'], param['S'], param['C'], param['K'])
@@ -44,18 +55,19 @@ with open("Resnet50_model.m") as fin:
             C_t = 1
             XY = IF[0] * IF[1]
 
-            if XY < defs.wt_file_size * defs.num_pe_x * defs.num_pe_y:
+            if XY < defs.poly_n:
                 XY_t = XY
                 while C_t < IF[2]:
                     C_t *= 2
-                    if XY*C_t > defs.wt_file_size * defs.num_pe_x * defs.num_pe_y:
+                    if XY*C_t > defs.poly_n:
                         C_t /= 2
                         break
             else:
-                XY_t = defs.wt_file_size * defs.num_pe_x * defs.num_pe_y
+                XY_t = defs.poly_n
 
             i=0
-            print("\nFor Iter {:3d}:  XY_t:{:4d}  C_t:{:4d}  XY*C_t:{:4d}".format(i, XY_t, C_t, XY*C_t))
+            if console_print:
+                print("\nFor Iter {:3d}:  XY_t:{:4d}  C_t:{:4d}  XY*C_t:{:4d}".format(i, XY_t, C_t, XY*C_t))
 
             # Define Classes and globals
             defs.c_t = C_t
@@ -64,7 +76,7 @@ with open("Resnet50_model.m") as fin:
             defs.arch = arch
             defs.batch_size = batch
             defs.poly_n = poly_n
-            defs.num_chiplets = defs.poly_n / (defs.wt_file_size * defs.num_pe)
+            # defs.num_chiplets = defs.poly_n / (defs.wt_file_size * defs.num_pe)
 
             if defs.arch == 'f1':
                 defs.rotation = defs.rotation_f1
@@ -92,8 +104,8 @@ with open("Resnet50_model.m") as fin:
                 
                 # TODO: Discuss this again
                 if W[2]/C_t <= defs.max_c_on_chiplt:
-                    main_chiplet.memory.stats_accesses += defs.num_pe_x * defs.num_pe_y * defs.if_file_size * min(defs.max_c_on_chiplt, W[2]/C_t)
-                    main_chiplet.if_l2_cache.stats_accesses += defs.num_pe_x * defs.num_pe_y * defs.if_file_size * min(defs.max_c_on_chiplt, W[2]/C_t)
+                    main_chiplet.memory.stats_accesses += defs.if_file_size * min(defs.max_c_on_chiplt, W[2]/C_t)
+                    main_chiplet.if_l2_cache.stats_accesses += defs.if_file_size * min(defs.max_c_on_chiplt, W[2]/C_t)
                 else:
                     print("\t[ERROR] Handle This Case!!!")
                     exit()
@@ -121,5 +133,9 @@ with open("Resnet50_model.m") as fin:
                         
 
             main_chiplet.calc_time_cheetah()
-            main_chiplet.print_stats_console(IF, W)
-            break
+
+            if console_print:
+                main_chiplet.print_stats_console(IF, W)
+                break
+            else:
+                main_chiplet.print_stats_file(IF, W, name)

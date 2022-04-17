@@ -242,7 +242,6 @@ class PE_Basic:
         self.adds.stats_accesses += self.adds.num
 
         # Stats
-        self.permt += 1
         self.calls += 1
 
 
@@ -285,7 +284,6 @@ class ROT_Stats(PE_Basic):
 
     def print_rot_stats(self):
         print("=== ROT Stats ===")
-        print("Calls\t\t:\t{}".format(self.calls))
         print("Total Shift\t:\t{}".format(self.shift))
         print("Total Perms\t:\t{}".format(self.permt))
         self.print_pe_stats()
