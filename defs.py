@@ -14,14 +14,24 @@ c_t = None
 
 packing    = "cheetah"
 ntt_type   = "baseline"
-batch_size = 1
+arch       = "f1"
+num_muls   = None
 poly_n     = 1024
+batch_size = 1
 
 num_chiplets  = None
 
-# Processor
-cycle_time = 5     # In ns
+# Arch Choices
+# TODO: Confirm and Parameterise
+rotation_f1    = 64     # Rotation for n = 1024 
+rotation_hyena = 1      # Benes network FTW!
+rotation       = None
 
+# Processor
+cycle_time = None     # In Ticks
+tick_time  = 5        # In ns
+
+# TODO: Multiply with 16 because it is monolythic
 
 # PE
 

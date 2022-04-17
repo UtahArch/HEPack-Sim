@@ -13,9 +13,11 @@ import os
 
 os.system('clear')
 
-ntttype = sys.argv[1]
-poly_n  = int(sys.argv[2])
-batch   = 1
+ntttype  = sys.argv[1]
+arch     = sys.argv[2]
+poly_n   = int(sys.argv[3])
+num_muls = int(sys.argv[4])
+batch    = 1
 
 
 with open("Resnet50_model.m") as fin:
@@ -70,20 +72,29 @@ with open("Resnet50_model.m") as fin:
             defs.k_t = K_t
             defs.packing = "epic"
             defs.ntt_type = ntttype
+            defs.arch = arch
             defs.batch_size = batch
             defs.poly_n = poly_n
             defs.num_chiplets = defs.poly_n / (defs.wt_file_size * defs.num_pe)
 
-            main_chiplet = packings.Chiplet()
+            if defs.arch == 'f1':
+                defs.rotation = defs.rotation_f1
+            elif defs.arch == 'hyena':
+                defs.rotation = defs.rotation_hyena
+            else:
+                print "Error with def.rotation", defs.rotation
 
-            # Bring Values to KSH and twiddle
-            # For optimised NTT Twiddle carries the hints
-            # TODO: Since Re-Use distance it soo much do we have a KSH and Twiddle L2 cache? How does L2 change for large polynomials
-            # TODO: main_chiplet.pe_array.ksh_file.size / C_t feels wrong
-            main_chiplet.ksh_l2_cache.stats_accesses += main_chiplet.pe_array.ksh_file.size / C_t
-            main_chiplet.memory.stats_accesses += main_chiplet.pe_array.ksh_file.size / C_t
-            main_chiplet.pe_array.twiddle.stats_accesses += main_chiplet.pe_array.twiddle.size
-            main_chiplet.memory.stats_accesses += main_chiplet.pe_array.twiddle.size
+            main_chiplet = packings.Chiplet()
+            main_chiplet.setup_epic()
+
+            # # Bring Values to KSH and twiddle
+            # # For optimised NTT Twiddle carries the hints
+            # # TODO: Since Re-Use distance it soo much do we have a KSH and Twiddle L2 cache? How does L2 change for large polynomials
+            # # TODO: main_chiplet.pe_array.ksh_file.size / C_t feels wrong
+            # main_chiplet.ksh_l2_cache.stats_accesses += main_chiplet.pe_array.ksh_file.size / C_t
+            # main_chiplet.memory.stats_accesses += main_chiplet.pe_array.ksh_file.size / C_t
+            # main_chiplet.pe_array.twiddle.stats_accesses += main_chiplet.pe_array.twiddle.size
+            # main_chiplet.memory.stats_accesses += main_chiplet.pe_array.twiddle.size
 
             # Loop to finish all IFs
             for if_step in range(0, XY, XY_t):
@@ -106,22 +117,26 @@ with open("Resnet50_model.m") as fin:
                         # print("Running Iters {} : {} {} {}".format(i, if_step, k_step, c_step))
                         # An IF is brought for processing and run wts are brought
                         main_chiplet.pe_array.if_file.stats_accesses += main_chiplet.pe_array.if_file.size
+                        main_chiplet.pe_array.pip_stats.if_file.stats_accesses += main_chiplet.pe_array.if_file.size
                         main_chiplet.if_l2_cache.stats_accesses += main_chiplet.pe_array.if_file.size
                         main_chiplet.wt_l2_cache.stats_accesses += main_chiplet.pe_array.wt_file.size
                         main_chiplet.pe_array.wt_file.stats_accesses += main_chiplet.pe_array.wt_file.size
+                        main_chiplet.pe_array.pip_stats.wt_file.stats_accesses += main_chiplet.pe_array.wt_file.size
 
+                        # break
                         # Number of rotations = R S C_t K_t / C_t
                         main_chiplet.run_epic(W[1] * W[0] * K_t)
                         # break
                     
                     # Flush PSUM to memory
                     main_chiplet.pe_array.psum_file.stats_accesses += main_chiplet.pe_array.psum_file.size
+                    main_chiplet.pe_array.pip_stats.psum_file.stats_accesses += main_chiplet.pe_array.psum_file.size
                     main_chiplet.memory.stats_accesses += main_chiplet.pe_array.psum_file.size
                     # break
 
 
                 # break
 
-
+            main_chiplet.calc_time_epic()
             main_chiplet.print_stats_console(IF, W)
             break

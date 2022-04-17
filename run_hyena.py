@@ -16,9 +16,11 @@ os.system('clear')
 
 # Global Variables
 
-ntttype = sys.argv[1]
-poly_n  = int(sys.argv[2])
-batch   = 1
+ntttype  = sys.argv[1]
+arch     = sys.argv[2]
+poly_n   = int(sys.argv[3])
+num_muls = int(sys.argv[4])
+batch    = 1
 
 done_params = set()
 
@@ -29,7 +31,7 @@ with open("Resnet50_model.m") as fin:
         elif "Dimensions" in line:
             param = {}
             # line = "Dimensions { K: 128, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
-            # line = "Dimensions { K: 512, C: 512, R: 3, S: 3, Y: 7, X: 7 }"
+            line = "Dimensions { K: 512, C: 512, R: 3, S: 3, Y: 7, X: 7 }"
             # line = "Dimensions { K: 64, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
 
             if line in done_params:
@@ -89,49 +91,37 @@ with open("Resnet50_model.m") as fin:
             defs.k_t = K_t
             defs.packing = "hyena"
             defs.ntt_type = ntttype
+            defs.arch = arch
+            defs.num_muls = num_muls
             defs.batch_size = batch
             defs.poly_n = poly_n
             defs.num_chiplets = defs.poly_n / (defs.wt_file_size * defs.num_pe)
 
+            if defs.arch == 'f1':
+                defs.rotation = defs.rotation_f1
+            elif defs.arch == 'hyena':
+                defs.rotation = defs.rotation_hyena
+            else:
+                print "Error with def.rotation", defs.rotation
+                exit()
+
             main_chiplet = packings.Chiplet()
-            
-            if ntttype == 'baseline':
-                main_chiplet.ntt_choice = -1
-            elif ntttype == 'f1':
-                main_chiplet.ntt_choice = -1
-            elif ntttype == 'opt':
-                # Decide on NTT to use
-                # TODO: Discuss this
-                f1_cost = main_chiplet.pe_array.op_ntt_f1("wt", "dry")
-                opt_cost = main_chiplet.pe_array.op_ntt_opt("wt", RS, "dry") 
-                                                                
-                if defs.num_chiplets == 1:
-                    hop_time = 2 * defs.phop_time
-                else:
-                    hop_time = 2 * defs.chop_time
+            main_chiplet.setup_hyena(RS*C_t, W[2], W[3])
 
-                if f1_cost*2 + 2*hop_time < opt_cost:
-                    main_chiplet.ntt_choice = 0
-                    defs.ntt_type = 'f1'
-                else:
-                    main_chiplet.ntt_choice = RS
-
-                print "NTT Choice", main_chiplet.ntt_choice
-                print f1_cost*2 + 2*hop_time
-                print opt_cost
+            # continue
 
             # Bring Values to KSH and twiddle
             # For optimised NTT Twiddle carries the hints
             # TODO: Since Re-Use distance it soo much do we have a KSH and Twiddle L2 cache? How does L2 change for large polynomials
             # TODO: main_chiplet.pe_array.ksh_file.size / C_t feels wrong
-            main_chiplet.ksh_l2_cache.stats_accesses += main_chiplet.pe_array.ksh_file.size / C_t
-            main_chiplet.memory.stats_accesses += main_chiplet.pe_array.ksh_file.size / C_t
-            main_chiplet.pe_array.twiddle.stats_accesses += main_chiplet.pe_array.twiddle.size
-            main_chiplet.memory.stats_accesses += main_chiplet.pe_array.twiddle.size
+            # main_chiplet.ksh_l2_cache.stats_accesses += main_chiplet.pe_array.ksh_file.size / C_t
+            # main_chiplet.memory.stats_accesses += main_chiplet.pe_array.ksh_file.size / C_t
+            # main_chiplet.pe_array.twiddle.stats_accesses += main_chiplet.pe_array.twiddle.size
+            # main_chiplet.memory.stats_accesses += main_chiplet.pe_array.twiddle.size
             
             num_k_memory = max(0, W[2]/C_t * W[3]/K_t - defs.max_c_on_chiplt)
             if W[2]/C_t > defs.max_c_on_chiplt:
-                print "Handle this case for ifs
+                print "Handle this case for ifs"
                 exit()
 
             
@@ -144,8 +134,8 @@ with open("Resnet50_model.m") as fin:
 
                     # Fill the L2 cache with wts
                     # Store C/C_t x K/K_t wts in the L2, the rest will have to be handled from memory
-                    main_chiplet.memory.stats_accesses += defs.num_pe_x * defs.num_pe_y * defs.wt_file.size * min(defs.max_c_on_chiplt, W[2]/C_t * W[3]/K_t)
-                    main_chiplet.wt_l2_cache.stats_accesses += defs.num_pe_x * defs.num_pe_y * defs.wt_file.size * min(defs.max_c_on_chiplt, W[2]/C_t * W[3]/K_t)
+                    main_chiplet.memory.stats_accesses += defs.poly_n * min(defs.max_c_on_chiplt, W[2]/C_t * W[3]/K_t)
+                    main_chiplet.wt_l2_cache.stats_accesses += defs.poly_n * min(defs.max_c_on_chiplt, W[2]/C_t * W[3]/K_t)
 
                     iters = 0
                     for k_step in range(0, W[3], K_t):        # Iterate over all kernels in K_t steps for wts
@@ -155,19 +145,28 @@ with open("Resnet50_model.m") as fin:
                                 main_chiplet.wt_l2_cache.stats_accesses += main_chiplet.pe_array.wt_file.size
                             else:
                                 main_chiplet.memory.stats_accesses += main_chiplet.pe_array.wt_file.size
-                            main_chiplet.wt_file.stats_accesses += main_chiplet.pe_array.wt_file.size
+                            main_chiplet.pe_array.wt_file.stats_accesses += main_chiplet.pe_array.wt_file.size
+                            main_chiplet.pe_array.pip_stats.wt_file.stats_accesses += main_chiplet.pe_array.wt_file.size
                             # Access ifs from L2
                             main_chiplet.if_l2_cache.stats_accesses += main_chiplet.pe_array.if_file.size
-                            main_chiplet.if_file.stats_accesses += main_chiplet.pe_array.if_file.size
+                            main_chiplet.pe_array.if_file.stats_accesses += main_chiplet.pe_array.if_file.size
+                            main_chiplet.pe_array.pip_stats.if_file.stats_accesses += main_chiplet.pe_array.if_file.size
 
+                            # break
                             main_chiplet.run_hyena_k()
+                            # break
                             iters += 1
                         
+                        # break
                         main_chiplet.run_hyena_psum_collect(RS*C_t)
+                        # break
+                        # TODO: Flush PSUM to memory won't happen here?
                     
                     # Flush PSUM to memory
                     main_chiplet.pe_array.psum_file.stats_accesses += main_chiplet.pe_array.psum_file.size
+                    main_chiplet.pe_array.pip_stats.psum_file.stats_accesses += main_chiplet.pe_array.psum_file.size
                     main_chiplet.memory.stats_accesses += main_chiplet.pe_array.psum_file.size
+                    # break
 
                     if p != 0:
                         # Iterate over all channels in C_t steps for ifs
@@ -178,6 +177,6 @@ with open("Resnet50_model.m") as fin:
                             main_chiplet.if_l2_cache.stats_accesses += main_chiplet.pe_array.if_file.size
                             main_chiplet.run_hyena_permute_if()
 
-
-            # main_chiplet.print_stats_console(IF, W)
-            # break
+            main_chiplet.calc_time_hyena()
+            main_chiplet.print_stats_console(IF, W)
+            break

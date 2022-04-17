@@ -11,11 +11,13 @@ import packings
 import sys
 import os
 
-# os.system('clear')
+os.system('clear')
 
-ntttype = sys.argv[1]
-poly_n  = int(sys.argv[2])
-batch   = 1
+ntttype  = sys.argv[1]
+arch     = sys.argv[2]
+poly_n   = int(sys.argv[3])
+num_muls = int(sys.argv[4])
+batch    = 1
 
 
 with open("Resnet50_model.m") as fin:
@@ -55,24 +57,35 @@ with open("Resnet50_model.m") as fin:
             i=0
             print("\nFor Iter {:3d}:  XY_t:{:4d}  C_t:{:4d}  XY*C_t:{:4d}".format(i, XY_t, C_t, XY*C_t))
 
-            # Define Classes
+            # Define Classes and globals
             defs.c_t = C_t
             defs.packing = "cheetah"
             defs.ntt_type = ntttype
+            defs.arch = arch
             defs.batch_size = batch
             defs.poly_n = poly_n
             defs.num_chiplets = defs.poly_n / (defs.wt_file_size * defs.num_pe)
 
+            if defs.arch == 'f1':
+                defs.rotation = defs.rotation_f1
+            elif defs.arch == 'hyena':
+                defs.rotation = defs.rotation_hyena
+            else:
+                print "Error with def.rotation", defs.rotation
+
             main_chiplet = packings.Chiplet()
+            main_chiplet.setup_cheetah()
+
 
             # Bring Values to KSH and twiddle
             # For optimised NTT Twiddle carries the hints
             # TODO: Since Re-Use distance it soo much do we have a KSH and Twiddle L2 cache? How does L2 change for large polynomials
             # TODO: main_chiplet.pe_array.ksh_file.size / C_t feels wrong
-            main_chiplet.ksh_l2_cache.stats_accesses += main_chiplet.pe_array.ksh_file.size / C_t
-            main_chiplet.memory.stats_accesses += main_chiplet.pe_array.ksh_file.size / C_t
-            main_chiplet.pe_array.twiddle.stats_accesses += main_chiplet.pe_array.twiddle.size
-            main_chiplet.memory.stats_accesses += main_chiplet.pe_array.twiddle.size
+            # main_chiplet.ksh_l2_cache.stats_accesses += main_chiplet.pe_array.ksh_file.size / C_t
+            # main_chiplet.memory.stats_accesses += main_chiplet.pe_array.ksh_file.size / C_t
+            # main_chiplet.pe_array.twiddle.stats_accesses += main_chiplet.pe_array.twiddle.size
+            # main_chiplet.pe_array.pip_stats.twiddle.stats_accesses += main_chiplet.pe_array.twiddle.size
+            # main_chiplet.memory.stats_accesses += main_chiplet.pe_array.twiddle.size
 
             # Loop to finish all XYs of the IF
             for if_step in range(0, XY, XY_t):
@@ -92,17 +105,21 @@ with open("Resnet50_model.m") as fin:
                     for c_step in range(0, W[2], C_t):
                         # print("Running Iters {} : {} {} {}".format(i, if_step, k_step, c_step))
                         main_chiplet.pe_array.if_file.stats_accesses += main_chiplet.pe_array.if_file.size
+                        main_chiplet.pe_array.pip_stats.if_file.stats_accesses += main_chiplet.pe_array.if_file.size
                         main_chiplet.if_l2_cache.stats_accesses += main_chiplet.pe_array.if_file.size
 
                         # break
                         # print if_step, k, c_step
                         main_chiplet.run_cheetah(W[1] * W[0] * C_t)
 
-                        # TODO: Flush PSUM to memory here right? Or maybe in the below iter
-                        # break
+                        # Flush PSUM to memory
+                        main_chiplet.pe_array.psum_file.stats_accesses += main_chiplet.pe_array.psum_file.size
+                        main_chiplet.pe_array.pip_stats.psum_file.stats_accesses += main_chiplet.pe_array.psum_file.size
+                        main_chiplet.memory.stats_accesses += main_chiplet.pe_array.psum_file.size
                     # break
                 # break
                         
 
+            main_chiplet.calc_time_cheetah()
             main_chiplet.print_stats_console(IF, W)
             break

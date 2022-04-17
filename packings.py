@@ -9,6 +9,7 @@
 import elements
 import defs
 import funcs
+import math
 
 # Main Class
 class Chiplet(elements.PE_Basic):
@@ -21,31 +22,93 @@ class Chiplet(elements.PE_Basic):
         self.ksh_l2_cache = elements.Cache("KSH L2 Cache", defs.ksh_l2_size, defs.ksh_l2_read, defs.ksh_l2_write)
         self.memory = elements.Cache("Memory  ", -1, -1, -1)
 
+        self.pipeline_counts = 0
+        self.seq_counts = 0
+        self.cycles = 0
+        self.ntt_choice = None
+        self.stages = None
+        self.seq    = None
+        self.seq2   = None
+        self.seq_cost  = None
+        self.seq2_cost = None
+        self.seq_stall = None    # 0 - no stalls ; > 0 - seq_stall number of stalls
+        self.seq2stall = None    # 0 - no stalls ; > 0 - seq_stall number of stalls
+
         
     def print_stats_console(self, IF, W):
         print IF[0], IF[1], IF[2]
         print W[0], W[1], W[2], W[3]
-        print defs.k_t, defs.c_t, defs.packing, defs.ntt_type, defs.batch_size, defs.poly_n, defs.num_chiplets
+        for x in self.stages:
+            print x[0], x[1], "::",
+        print
+        if self.seq != None:
+            for x in self.seq:
+                print x[0], x[1], "::",
+            print
+            for x in self.seq2:
+                print x[0], x[1], "::",
+            print
+            print self.seq_cost, self.seq2_cost, self.seq_stall, self.seq2stall
+
+        print defs.k_t, defs.c_t, defs.packing, defs.ntt_type, defs.batch_size, defs.poly_n, defs.num_chiplets, defs.rotation, defs.cycle_time
         print("=== Stats ===")
-        print("Total Cycles Taken :\t{}".format(self.pe_array.cycles))
-        print("Total PE Hops      :\t{}".format(self.pe_array.phops))
-        print("Total Chiplet Hops :\t{}".format(self.pe_array.chops))
-        print("Total PHOP Time    :\t{}".format(self.pe_array.phops * defs.phop_time))
-        print("Total CHOP Time    :\t{}".format(self.pe_array.chops * defs.chop_time))
+        print("Total Cycles Taken :\t{}".format(self.cycles))
+        print("Total Steps        :\t{}".format(self.pipeline_counts))
+        print("Total Time Taken   :\t{}".format(self.cycles * defs.cycle_time))
+        # print("Total PE Hops      :\t{}".format(self.pe_array.phops))
+        # print("Total Chiplet Hops :\t{}".format(self.pe_array.chops))
+        # print("Total PHOP Time    :\t{}".format(self.pe_array.phops * defs.phop_time))
+        # print("Total CHOP Time    :\t{}".format(self.pe_array.chops * defs.chop_time))
         print("Total Shifts       :\t{}".format(self.pe_array.shift))
         print("Total Permutations :\t{}".format(self.pe_array.permt))
         print("=== Chiplet Stats ===")
-        self.pe_array.print_pe_stats()
+        # self.pe_array.print_pe_stats()
         self.if_l2_cache.print_stats()
         self.ksh_l2_cache.print_stats()
         self.memory.print_stats()
+        self.pe_array.pip_stats.print_pip_stats()
 
         self.pe_array.mul_stats.print_mul_stats()
         self.pe_array.ntt_stats.print_ntt_stats()
         self.pe_array.ksh_stats.print_ksh_stats()
+        self.pe_array.rot_stats.print_rot_stats()
 
+    # Cheetah
 
-    # Run Cheetah for all wts along the channel step that are packed
+    ## Calc Stages for cheetah
+    # TODO: Add for baseline ntt case
+    # TODO: Rotation and Tr are different right? RIGHT? op_ntt_f1_permute_cycles vs op_psum_rotate_cycle
+    def setup_cheetah(self):
+        # Pipeline:
+        # MUL
+        # NT1
+        # TR1   ==> Permute withing NTT Unit registers -> Transpose -> Permute in registers
+        # NT2
+        # ROT (PSUM)
+        # NI1
+        # TR2
+        # NI2
+        # KSH
+
+        # TODO: op_psum_rotate_cycles and op_ntt_f1_permute_cycles are the same thing
+        self.stages = [
+            ("MUL",self.pe_array.op_mul_if_wt_cycles()),
+            ("NT1",self.pe_array.op_ntt_f1_cycles("psum")),
+            ("TR1",self.pe_array.op_ntt_f1_permute_cycles("psum")),
+            ("NT2",self.pe_array.op_ntt_f1_cycles("psum")),
+            ("ROT",self.pe_array.op_psum_rotate_cycles()),
+            ("NI1",self.pe_array.op_ntt_f1_cycles("psum")),
+            ("TR2",self.pe_array.op_ntt_f1_permute_cycles("psum")),
+            ("NI2",self.pe_array.op_ntt_f1_cycles("psum")),
+            ("KSH",self.pe_array.op_ksh_psum_cycles())
+        ]
+
+        defs.cycle_time = max([x[1] for x in self.stages])
+        
+        print self.stages
+        print defs.cycle_time
+
+    ## Run Cheetah for all wts along the channel step that are packed
     def run_cheetah(self, runs):
         
         # return
@@ -53,94 +116,273 @@ class Chiplet(elements.PE_Basic):
         # An IF is brought for processing and run wts are brouht
         self.memory.stats_accesses  += runs * self.pe_array.wt_file.size
         self.pe_array.wt_file.stats_accesses += runs * self.pe_array.wt_file.size
+        self.pe_array.pip_stats.wt_file.stats_accesses += runs * self.pe_array.wt_file.size
         # self.pe_array.if_file.stats_accesses += self.pe_array.if_file.size
 
-        # return
         for i in range(runs):
-            # Perform mult
-            self.pe_array.op_mul_if_wt_ksh()
-            # return
+            self.pipeline_counts += 1
 
-            # Rotate PSUM for next mult
-            self.pe_array.op_ntt_util('psum')
-            # return
+            self.pe_array.op_mul_if_wt()
+            self.pe_array.op_ntt_f1("psum")
+            self.pe_array.op_ntt_f1_permute("psum")
+            self.pe_array.op_ntt_f1("psum")
             self.pe_array.op_psum_rotate()
-            self.pe_array.op_ntt_util('psum')
-
-            # Access the ksh for the next rotation
+            self.pe_array.op_ntt_f1("psum")
+            self.pe_array.op_ntt_f1_permute("psum")
+            self.pe_array.op_ntt_f1("psum")
+            self.pe_array.op_ksh_psum()
+            
             # TODO: What is the L2 cache size required for this?
             self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size
 
-    # Run Cheetah for all wts and ifs that are packed
+    def calc_time_cheetah(self):
+        self.cycles = self.pipeline_counts + len(self.stages)
+
+    
+    # EPIC
+    ## Calc Stages for Epic
+    def setup_epic(self):
+        # Pipeline:
+        # I1W
+        # T1W
+        # I2W
+        # ROW
+        # MUL
+        # N1P
+        # T1P
+        # N2P
+        # ROP
+        # I1P
+        # T2P
+        # I2P
+        # KSH
+        
+        # TODO: op_psum_rotate_cycles and op_ntt_f1_permute_cycles are the same thing
+        self.stages = [
+            ("I1W",self.pe_array.op_ntt_f1_cycles("wt")),
+            ("T1W",self.pe_array.op_ntt_f1_permute_cycles("wt")),
+            ("I2W",self.pe_array.op_ntt_f1_cycles("wt")),
+            ("ROW",self.pe_array.op_wt_rotate_cycles()),
+            ("MUL",self.pe_array.op_mul_if_wt_cycles()),
+            ("N1P",self.pe_array.op_ntt_f1_cycles("psum")),
+            ("T1P",self.pe_array.op_ntt_f1_permute_cycles("psum")),
+            ("N2P",self.pe_array.op_ntt_f1_cycles("psum")),
+            ("ROP",self.pe_array.op_psum_rotate_cycles()),
+            ("I1P",self.pe_array.op_ntt_f1_cycles("psum")),
+            ("T2P",self.pe_array.op_ntt_f1_permute_cycles("psum")),
+            ("I2P",self.pe_array.op_ntt_f1_cycles("psum")),
+            ("KSH",self.pe_array.op_ksh_psum_cycles())
+        ]
+        
+        defs.cycle_time = max([x[1] for x in self.stages])
+        
+        print self.stages
+        print defs.cycle_time
+        
+    
+    ## Run EPIC for all wts and ifs that are packed
     def run_epic(self, runs):
 
         for i in range(runs):
-            # Perform mult
-            self.pe_array.op_mul_if_wt_ksh()
-            # return
+            self.pipeline_counts += 1
 
-            # Rotate PSUM and wts for next mult
-            # TODO: Is this okay?
-            self.pe_array.op_ntt_util('psum')
-            # return
-            self.pe_array.op_ntt_util('wt')
-            # return
-            self.pe_array.op_psum_wt_rotate()
-            self.pe_array.op_ntt_util('psum')
-            self.pe_array.op_ntt_util('wt')
+            self.pe_array.op_ntt_f1("wt")
+            self.pe_array.op_ntt_f1_permute("wt")
+            self.pe_array.op_ntt_f1("wt")
+            self.pe_array.op_wt_rotate()
+            self.pe_array.op_mul_if_wt()
+            self.pe_array.op_ntt_f1("psum")
+            self.pe_array.op_ntt_f1_permute("psum")
+            self.pe_array.op_ntt_f1("psum")
+            self.pe_array.op_psum_rotate()
+            self.pe_array.op_ntt_f1("psum")
+            self.pe_array.op_ntt_f1_permute("psum")
+            self.pe_array.op_ntt_f1("psum")
+            self.pe_array.op_ksh_psum()
 
             # Access the ksh for the next rotation
             # TODO: What is the L2 cache size required for this?
             self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size
 
-    
+    def calc_time_epic(self):
+        self.cycles = self.pipeline_counts + len(self.stages)
+
+     
+    # Hyena
+
+    ## Setup 
+    def setup_hyena(self, rsct, C, K):
+        
+        # Check if shifting RSC_t times for NTT is better than using F1 NTT (in case defs.ntt_type is opt)
+        self.ntt_choice = 'f1'
+        f1_cost  = 2*self.pe_array.op_ntt_f1_cycles("wt")+2*self.pe_array.op_ntt_f1_permute_cycles("wt")
+        if defs.ntt_type == 'opt':
+            opt_cost = self.pe_array.op_ntt_opt_cycles("wt", rsct)
+
+            if f1_cost > opt_cost:
+                self.ntt_choice = 'opt'
+
+        if self.ntt_choice != 'opt':
+            # Pipeline:
+            # I1W
+            # T1W
+            # I2W
+            # ROW   
+            # MUL
+            self.stages = [
+                ("I1W",self.pe_array.op_ntt_f1_cycles("wt")),
+                ("T1W",self.pe_array.op_ntt_f1_permute_cycles("wt")),
+                ("I2W",self.pe_array.op_ntt_f1_cycles("wt")),
+                ("ROW",self.pe_array.op_wt_rotate_cycles()),
+                ("MUL",self.pe_array.op_mul_if_wt_cycles()),
+            ]
+        else:
+            # TODO: Is there an extra access that I have to make? Yes for c1, essentially double wt accesses from memory
+            # TODO: Doing OPT NTT is not actually a shift is it? ==> PERMT will have an energy cost, but shift won't (only in psum accumulate)
+            # Pipeline:
+            # I1W
+            # MUL
+            self.stages = [
+                ("I1W",self.pe_array.op_ntt_opt_cycles("wt")),
+                ("MUL",self.pe_array.op_mul_if_wt_cycles()),
+            ]
+
+        defs.cycle_time = max([x[1] for x in self.stages])
+        
+        # Psum Collection is a separate sequence
+        if self.ntt_choice != 'opt':
+            # NTT -> RSCt Rotations -> NTT -> RSCt Accumulation
+            # N1P
+            # T1P
+            # N2P
+            # ROP - RSC_t times to generate all partial sums (will also have accumulate)
+            # I1P
+            # T2P
+            # I2P
+            # KSH - RSC_t times (due to NTT Property) TODO: Confirm why this can be done again, Also as we are doing it on 1 value can that be exploited?
+            self.seq = [
+                ("N1P",self.pe_array.op_ntt_f1_cycles("psum")),
+                ("T1P",self.pe_array.op_ntt_f1_permute_cycles("psum")),
+                ("N2P",self.pe_array.op_ntt_f1_cycles("psum")),
+                ("ROP",self.pe_array.op_psum_rotate_cycles(rsct)),
+                ("I1P",self.pe_array.op_ntt_f1_cycles("psum")),
+                ("T2P",self.pe_array.op_ntt_f1_permute_cycles("psum")),
+                ("I2P",self.pe_array.op_ntt_f1_cycles("psum")),
+                # TODO: /defs.num_muls on this value
+                ("KSH",self.pe_array.op_ksh_psum_cycles(rsct)),
+            ]
+            self.seq_cost  = int(math.ceil(sum([x[1] for x in self.seq]) / float(defs.cycle_time)))
+        
+        else:
+            # NTT -> RSCt pipeline of OPNTT-KSH
+            self.seq = [
+                ("N1P",self.pe_array.op_ntt_f1_cycles("psum"), 1),
+                ("T1P",self.pe_array.op_ntt_f1_permute_cycles("psum"), 1),
+                ("N2P",self.pe_array.op_ntt_f1_cycles("psum"), 1),
+                ("ONT",self.pe_array.op_ntt_opt_cycles("psum"), rsct),
+                ("KSH",self.pe_array.op_ksh_psum_cycles(), rsct),
+            ]
+            
+            # 3 cycles for NTT and 2*RSCt cycls for OPNTT-KSH
+            self.seq_cost = int(math.ceil(3*self.seq[0][1]/float(defs.cycle_time))) + 2*rsct
+
+        # IF Permutation is a separate sequence
+        self.seq2 = [
+            ("N1I",self.pe_array.op_ntt_f1_cycles("if")),
+            ("T1I",self.pe_array.op_ntt_f1_permute_cycles("if")),
+            ("N2I",self.pe_array.op_ntt_f1_cycles("if")),
+            ("ROI",self.pe_array.op_if_rotate_cycles()),
+            ("I1I",self.pe_array.op_ntt_f1_cycles("if")),
+            ("T2I",self.pe_array.op_ntt_f1_permute_cycles("if")),
+            ("I2I",self.pe_array.op_ntt_f1_cycles("if")),
+            ("KSH",self.pe_array.op_ksh_if_cycles()),
+        ]
+        # TODO: Is it going to be a sum or the len?
+        self.seq2_cost = len(self.seq2)
+
+
+        print self.stages
+        print self.seq
+        print self.seq2
+
+        # Check if psum collection will cause stalls to happen
+        if float(C)*defs.k_t/defs.c_t > self.seq_cost:
+            self.seq_stall = 0
+        else:
+            self.seq_stall = int(self.seq_cost - float(C)*defs.k_t/defs.c_t)
+
+        # Check if if permutation will cause stalls to happen
+        temp = (float(C)*defs.k_t/defs.c_t + self.seq_stall)*K/defs.k_t
+        if self.seq_stall > 0:
+            # Schedule on #1
+            self.seq2stall = max(0, self.seq2_cost - self.seq_stall)
+        else:
+            # Schedule on #2
+            self.seq2stall = max(0, self.seq2_cost - (float(C)*defs.k_t/defs.c_t - self.seq_cost))
+
+
+        if defs.ntt_type == 'opt':
+            print defs.cycle_time, "\t", self.seq_cost, self.seq2_cost, "\t", self.seq_stall, self.seq2stall, "\t", self.ntt_choice, f1_cost, opt_cost
+        else:
+            print defs.cycle_time, "\t", self.seq_cost, self.seq2_cost, "\t", self.seq_stall, self.seq2stall, "\t", self.ntt_choice, f1_cost
+
     # Run Hyena for all wts and ifs that are packed
     def run_hyena_k(self):
         
         for k in range(defs.k_t):
-            # Perform mult
-            self.pe_array.op_mul_if_wt()
+            self.pipeline_counts += 1
 
-            # Rotate wts with an RSCt stride
-            if self.ntt_choice <= 0:
-                # print self.pe_array.cycles
-                temp = self.pe_array.op_ntt_util('wt', self.ntt_choice)
-                # print self.pe_array.cycles, temp
-                temp = self.pe_array.op_wt_rotate()
-                # print self.pe_array.cycles, temp
-                temp = self.pe_array.op_ntt_util('wt', self.ntt_choice)
-                # print self.pe_array.cycles, temp
+            if self.ntt_choice != 'opt':
+                self.pe_array.op_ntt_f1("wt")
+                self.pe_array.op_ntt_f1_permute("wt")
+                self.pe_array.op_ntt_f1("wt")
+                self.pe_array.op_wt_rotate()
+                self.pe_array.op_mul_if_wt()
             else:
-                self.pe_array.op_ntt_util('wt', self.ntt_choice)
-
-            return
+                self.pe_array.op_ntt_opt("wt")
+                self.pe_array.op_mul_if_wt()
 
     # Collate all psums present in it
-    def run_hyena_psum_collect(self, iters):
-        if self.ntt_choice <= 0:
-            temp = self.pe_array.op_ntt_util('psum', self.ntt_choice)
-            # print self.pe_array.cycles, temp
-            self.pe_array.op_ksh_psum(iters)
-            # print self.pe_array.cycles, temp
-            temp = self.pe_array.op_ntt_util('psum', self.ntt_choice)
+    # This will be performed on a different set of hardware and so can happen in the background
+    # If run_hyena_k finishes before this, then it has to wait until this is complete before we can proceed
+    # TODO: This will have some extra copies happening -- heck all stages will have some extra back and forth
+    def run_hyena_psum_collect(self, rsct):
+        
+        if self.ntt_choice != 'opt':
+            self.pe_array.op_ntt_f1("psum")
+            self.pe_array.op_ntt_f1_permute("psum")
+            self.pe_array.op_ntt_f1("psum")
+            self.pe_array.op_psum_rotate(rsct)
+            self.pe_array.op_ntt_f1("psum")
+            self.pe_array.op_ntt_f1_permute("psum")
+            self.pe_array.op_ntt_f1("psum")
+            self.pe_array.op_ksh_psum(rsct)
         else:
-            temp = self.pe_array.op_ntt_util('psum', 0)
-            # print self.pe_array.cycles, temp
-            self.pe_array.op_ksh_psum(iters)
-            # print self.pe_array.cycles, temp
-            temp = self.pe_array.op_ntt_util('psum', 0)
+            self.pe_array.op_ntt_f1("psum")
+            self.pe_array.op_ntt_f1_permute("psum")
+            self.pe_array.op_ntt_f1("psum")
+            for _ in range(rsct):
+                self.pe_array.op_ntt_opt("psum")
+                self.pe_array.op_ksh_psum()
+
+        self.cycles += self.seq_stall
+        
 
     # Permute the IF
+    # TODO: Discuss stalls for this
     def run_hyena_permute_if(self):
-        if self.ntt_choice <= 0:
-            temp = self.pe_array.op_ntt_util('if', self.ntt_choice)
-            # print self.pe_array.cycles, temp
-            self.pe_array.op_ksh_if()
-            # print self.pe_array.cycles, temp
-            temp = self.pe_array.op_ntt_util('if', self.ntt_choice)
-        else:
-            temp = self.pe_array.op_ntt_util('if', 0)
-            # print self.pe_array.cycles, temp
-            self.pe_array.op_ksh_if()
-            # print self.pe_array.cycles, temp
-            temp = self.pe_array.op_ntt_util('if', 0)
+        self.pe_array.op_ntt_f1("if")
+        self.pe_array.op_ntt_f1_permute("if")
+        self.pe_array.op_ntt_f1("if")
+        self.pe_array.op_if_rotate()
+        self.pe_array.op_ntt_f1("if")
+        self.pe_array.op_ntt_f1_permute("if")
+        self.pe_array.op_ntt_f1("if")
+        self.pe_array.op_ksh_if()
+
+        self.cycles += self.seq2stall
+
+    def calc_time_hyena(self):
+        print self.cycles
+        self.cycles += self.pipeline_counts + len(self.stages)
+        print self.cycles
