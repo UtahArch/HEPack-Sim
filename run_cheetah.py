@@ -18,8 +18,8 @@ if console_print:
 
 ntttype  = sys.argv[1]
 arch     = sys.argv[2]
-poly_n   = int(sys.argv[3])
-num_muls = int(sys.argv[4])
+poly_n   = 1024
+num_muls = 1
 batch    = 1
 
 done_params = set()
@@ -32,13 +32,13 @@ with open("Resnet50_model.m") as fin:
             param = {}
             if console_print:
                 # line = "Dimensions { K: 128, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
-                line = "Dimensions { K: 512, C: 512, R: 3, S: 3, Y: 7, X: 7 }"
+                line = "Dimensions { K: 1, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
                 # line = "Dimensions { K: 64, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
             
-            if line in done_params:
-                continue
-            else:
-                done_params.add(line)
+            # if line in done_params:
+            #     continue
+            # else:
+            #     done_params.add(line)
             
             temp = line.split("{")[1].split("}")[0].split(",")
             for t in temp:
@@ -76,7 +76,7 @@ with open("Resnet50_model.m") as fin:
             defs.arch = arch
             defs.batch_size = batch
             defs.poly_n = poly_n
-            # defs.num_chiplets = defs.poly_n / (defs.wt_file_size * defs.num_pe)
+            defs.num_chiplets = defs.poly_n / (defs.pe_size)
 
             if defs.arch == 'f1':
                 defs.rotation = defs.rotation_f1
@@ -102,7 +102,6 @@ with open("Resnet50_model.m") as fin:
             # Loop to finish all XYs of the IF
             for if_step in range(0, XY, XY_t):
                 
-                # TODO: Discuss this again
                 if W[2]/C_t <= defs.max_c_on_chiplt:
                     main_chiplet.memory.stats_accesses += defs.if_file_size * min(defs.max_c_on_chiplt, W[2]/C_t)
                     main_chiplet.if_l2_cache.stats_accesses += defs.if_file_size * min(defs.max_c_on_chiplt, W[2]/C_t)

@@ -531,4 +531,11 @@ Network Resnet50 {
 	}
 
 
+	Layer FC1000 {
+		Type: CONV
+		Stride { X: 1, Y: 1 }		
+		Dimensions { K: 1000, C: 2048, R: 7, S: 7, Y: 7, X: 7 }
+
+	}
+
 }

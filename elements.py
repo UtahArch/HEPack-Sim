@@ -56,8 +56,8 @@ class PE_Basic:
         self.wt_file = Cache("WT File ", defs.wt_file_size, defs.wt_file_read, defs.wt_file_write)
         
         self.twiddle = Cache("Twiddle ", defs.twiddle_size, defs.twiddle_read, defs.twiddle_write)
-        if defs.ntt_type == 'opt':
-            self.twicoef = Cache("TwiCoef ", defs.twicoef_size, defs.twicoef_read, defs.twicoef_write)
+        # if defs.ntt_type == 'opt':
+        #     self.twicoef = Cache("TwiCoef ", defs.twicoef_size, defs.twicoef_read, defs.twicoef_write)
         
         self.ksh_file = Cache("KSH File", defs.wt_file_size, defs.ksh_file_read, defs.ksh_file_write)
         # The PSUM File is actually a collection of psum_file_num files but we represent it as 1 file and do the nessacery scaling later
@@ -82,8 +82,8 @@ class PE_Basic:
         self.wt_file.print_structure()
         
         self.twiddle.print_structure()
-        if defs.ntt_type == 'opt':
-            self.twicoef.print_structure()
+        # if defs.ntt_type == 'opt':
+        #     self.twicoef.print_structure()
         
         self.ksh_file.print_structure()
         self.psum_file.print_structure()
@@ -96,8 +96,8 @@ class PE_Basic:
         self.wt_file.print_stats()
 
         self.twiddle.print_stats()
-        if defs.ntt_type == 'opt':
-            self.twicoef.print_stats()
+        # if defs.ntt_type == 'opt':
+        #     self.twicoef.print_stats()
 
         self.ksh_file.print_stats()
         self.psum_file.print_stats()
@@ -118,7 +118,6 @@ class PE_Basic:
         self.calls  += 1
 
     # Perform NTT on a specific file
-    # TODO: How is the twiddle used in NTTs? Does it increase the number of mults
     def update_ntt_baseline(self, mode, steps):
         if mode == 'psum':
             reg_file = self.psum_file
@@ -137,21 +136,6 @@ class PE_Basic:
         
         # Stats
         self.calls  += 1
-    
-    # def update_ntt_f1_permute(self, mode):
-    #     if mode == 'psum':
-    #         reg_file = self.psum_file
-    #     elif mode == 'wt':
-    #         reg_file = self.wt_file
-    #     elif mode == 'if':
-    #         reg_file = self.if_file
-
-    #     # TODO: Does Rotation actually increase the number of accesses by a lot?
-    #     # Permute -> Read -> Transpose
-    #     reg_file.stats_accesses += 2 * reg_file.size
-
-    #     # stats
-    #     self.permt += 1
         
     def update_ntt_opt(self, mode, stride):
         if mode == 'psum':
@@ -166,15 +150,14 @@ class PE_Basic:
         self.muls.stats_accesses += stride * self.muls.num        
         # Read 1 values from the file do computations and finally write into that location
         # Along with Black Magic
-        self.twicoef.stats_accesses += stride * reg_file.size
+        # self.twicoef.stats_accesses += stride * reg_file.size
         reg_file.stats_accesses += 2 * reg_file.size  # This will not have stride as we do 1 read and write
         
         # Stats
         self.calls  += 1
-        self.shift  += stride
+        self.shift  += 1
 
     # Updates for rotates
-    # TODO: Will wire energy be captured in permt? 
     # Number of permts == Number of accesses to transpose unit + internal permts (for F1 Arch) and benes network (for Hyena Arch)
 
     def update_psum_rotate(self, iters):
@@ -222,24 +205,11 @@ class PE_Basic:
         # Stats
         self.calls  += iters
 
-    # def update_ksh_psum_acc(self, iters):
-    #     # TODO: Confirm number of adds here
-    #     # We MAC iters KSH with PSUMs and then accumulate iter times
-    #     self.ksh_file.stats_accesses += self.ksh_file.size * iters
-    #     self.psum_file.stats_shifts += iters
-    #     self.psum_file.stats_accesses += self.psum_file.size * iters
-    #     self.muls.stats_accesses += self.muls.num * iters
-    #     self.adds.stats_accesses += self.adds.num * iters
-
-    #     self.shift += iters
-    #     self.calls += 1
-
     def update_ksh_if(self):
         # We MAC iters KSH with IF
         self.ksh_file.stats_accesses += self.ksh_file.size
         self.if_file.stats_accesses += 2*self.if_file.size
         self.muls.stats_accesses += self.muls.num
-        self.adds.stats_accesses += self.adds.num
 
         # Stats
         self.calls += 1

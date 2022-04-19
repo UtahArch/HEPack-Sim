@@ -26,14 +26,15 @@ class Chiplet(elements.PE_Basic):
         self.pipeline_counts = 0
         self.seq_counts = 0
         self.cycles = 0
+        self.stalls = 0 
         self.ntt_choice = None
         self.stages = None
         self.seq    = None
         self.seq2   = None
+        self.stage_cost  = None
         self.seq_cost  = None
         self.seq2_cost = None
-        self.seq_stall = None    # 0 - no stalls ; > 0 - seq_stall number of stalls
-        self.seq2stall = None    # 0 - no stalls ; > 0 - seq_stall number of stalls
+        self.pipe_choice = None
 
         
     def print_stats_console(self, IF, W):
@@ -49,13 +50,15 @@ class Chiplet(elements.PE_Basic):
             for x in self.seq2:
                 print x[0], x[1], "::",
             print
-            print self.seq_cost, self.seq2_cost, self.seq_stall, self.seq2stall
+            print self.stage_cost, self.seq_cost, self.seq2_cost, "\t", self.pipe_choice
 
-        print defs.k_t, defs.c_t, defs.packing, defs.ntt_type, defs.batch_size, defs.poly_n, defs.num_chiplets, defs.rotation, defs.cycle_time
+        print defs.k_t, defs.c_t, defs.packing, defs.ntt_type, defs.arch, defs.batch_size, defs.poly_n, defs.num_chiplets, defs.rotation, self.ntt_choice, defs.cycle_time
         print("=== Stats ===")
         print("Total Cycles Taken :\t{}".format(self.cycles))
         print("Total Steps        :\t{}".format(self.pipeline_counts))
         print("Total Time Taken   :\t{}".format(self.cycles * defs.cycle_time))
+        print("Total Stalls       :\t{}".format(self.stalls))
+        print("Total Time in Stall:\t{}".format(self.stalls * defs.cycle_time))
         # print("Total PE Hops      :\t{}".format(self.pe_array.phops))
         # print("Total Chiplet Hops :\t{}".format(self.pe_array.chops))
         # print("Total PHOP Time    :\t{}".format(self.pe_array.phops * defs.phop_time))
@@ -140,11 +143,10 @@ class Chiplet(elements.PE_Basic):
             self.pe_array.op_ntt_f1("psum")
             self.pe_array.op_ksh_psum()
             
-            # TODO: What is the L2 cache size required for this?
             self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size
 
     def calc_time_cheetah(self):
-        self.cycles = self.pipeline_counts + len(self.stages)
+        self.cycles = self.pipeline_counts
 
     
     # EPIC
@@ -207,11 +209,10 @@ class Chiplet(elements.PE_Basic):
             self.pe_array.op_ksh_psum()
 
             # Access the ksh for the next rotation
-            # TODO: What is the L2 cache size required for this?
             self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size
 
     def calc_time_epic(self):
-        self.cycles = self.pipeline_counts + len(self.stages)
+        self.cycles = self.pipeline_counts
 
      
     # Hyena
@@ -224,22 +225,20 @@ class Chiplet(elements.PE_Basic):
         f1_cost  = 2*self.pe_array.op_ntt_f1_cycles("wt")+2*self.pe_array.op_wt_rotate_cycles()
         if defs.ntt_type == 'opt':
             opt_cost = self.pe_array.op_ntt_opt_cycles("wt", rsct)
-
-            if f1_cost > opt_cost:
-                self.ntt_choice = 'opt'
+            self.ntt_choice = 'opt'
 
         if self.ntt_choice != 'opt':
             # Pipeline:
             # I1W
             # T1W
             # I2W
-            # ROW   
+            # SHW   
             # MUL
             self.stages = [
                 ("I1W",self.pe_array.op_ntt_f1_cycles("wt")),
                 ("T1W",self.pe_array.op_wt_rotate_cycles()),
                 ("I2W",self.pe_array.op_ntt_f1_cycles("wt")),
-                ("ROW",self.pe_array.op_wt_rotate_cycles()),
+                ("SHW",self.pe_array.op_wt_rotate_cycles()),
                 ("MUL",self.pe_array.op_mul_if_wt_cycles()),
             ]
         else:
@@ -250,32 +249,33 @@ class Chiplet(elements.PE_Basic):
                 ("I1W",self.pe_array.op_ntt_opt_cycles("wt")),
                 ("MUL",self.pe_array.op_mul_if_wt_cycles()),
             ]
-
-        defs.cycle_time = max([x[1] for x in self.stages])
+        
+        self.stage_cost = int(math.ceil(float(C)*defs.k_t/defs.c_t)) * max([x[1] for x in self.stages])
         
         # Psum Collection is a separate sequence
         if self.ntt_choice != 'opt':
-            # NTT -> RSCt Rotations -> NTT -> RSCt Accumulation
+            # NTT -> RSCt ROT-NTT-KSH
+            #
             # N1P
             # T1P
             # N2P
-            # ROP - RSC_t times to generate all partial sums (will also have accumulate)
-            # I1P
-            # T2P
-            # I2P
-            # KSH - RSC_t times (due to NTT Property) TODO: Confirm why this can be done again, Also as we are doing it on 1 value can that be exploited?
+            # RSC_t times to generate all partial sums (will also have accumulate) (can be pipelined)
+            #   ROP
+            #   I1P
+            #   T2P
+            #   I2P
+            #   KSH
             self.seq = [
                 ("N1P",self.pe_array.op_ntt_f1_cycles("psum")),
                 ("T1P",self.pe_array.op_psum_rotate_cycles()),
                 ("N2P",self.pe_array.op_ntt_f1_cycles("psum")),
-                ("ROP",self.pe_array.op_psum_rotate_cycles(rsct)),
+                ("ROP",self.pe_array.op_psum_rotate_cycles()),
                 ("I1P",self.pe_array.op_ntt_f1_cycles("psum")),
                 ("T2P",self.pe_array.op_psum_rotate_cycles()),
                 ("I2P",self.pe_array.op_ntt_f1_cycles("psum")),
-                # TODO: /defs.num_muls on this value
-                ("KSH",self.pe_array.op_ksh_psum_cycles(rsct)),
+                ("KSH",self.pe_array.op_ksh_psum_cycles()),
             ]
-            self.seq_cost  = int(math.ceil(sum([x[1] for x in self.seq]) / float(defs.cycle_time)))
+            self.seq_cost  = (rsct) * max([x[1] for x in self.seq])
         
         else:
             # NTT -> RSCt pipeline of OPNTT-KSH
@@ -287,10 +287,12 @@ class Chiplet(elements.PE_Basic):
                 ("KSH",self.pe_array.op_ksh_psum_cycles(), rsct),
             ]
             
-            # 3 cycles for NTT and 2*RSCt cycls for OPNTT-KSH
-            self.seq_cost = int(math.ceil(3*self.seq[0][1]/float(defs.cycle_time))) + 2*rsct
+            # 3 steps for NTT and 2*RSCt times for OPNTT-KSH which can be pipelined
+            # TODO: Confirm this 3 should be bigger, or weight, this goes into the previous pipeline
+            self.seq_cost  = (rsct) * self.seq[3][1]
 
         # IF Permutation is a separate sequence
+        # TODO: Model the cost of this as well
         self.seq2 = [
             ("N1I",self.pe_array.op_ntt_f1_cycles("if")),
             ("T1I",self.pe_array.op_if_rotate_cycles()),
@@ -301,29 +303,34 @@ class Chiplet(elements.PE_Basic):
             ("I2I",self.pe_array.op_ntt_f1_cycles("if")),
             ("KSH",self.pe_array.op_ksh_if_cycles()),
         ]
-        # TODO: Is it going to be a sum or the len?
-        self.seq2_cost = len(self.seq2)
+
+        self.seq2_cost = 8 * max([x[1] for x in self.seq2])
 
 
         # print self.stages
         # print self.seq
         # print self.seq2
 
-        # Check if psum collection will cause stalls to happen
-        if float(C)*defs.k_t/defs.c_t > self.seq_cost:
-            self.seq_stall = 0
+        # Check which is going to be longer and make that the main pipeline
+        if self.seq_cost < self.stage_cost:
+            self.pipe_choice = 'mult'
+            defs.cycle_time = max([x[1] for x in self.stages])
         else:
-            self.seq_stall = int(self.seq_cost - float(C)*defs.k_t/defs.c_t)
+            self.pipe_choice = 'psum'
+            defs.cycle_time = max([x[1] for x in self.seq])        
 
-        # Check if if permutation will cause stalls to happen
-        temp = (float(C)*defs.k_t/defs.c_t + self.seq_stall)*K/defs.k_t
-        if self.seq_stall > 0:
-            # Schedule on #1
-            self.seq2stall = max(0, self.seq2_cost - self.seq_stall)
-        else:
-            # Schedule on #2
-            self.seq2stall = max(0, self.seq2_cost - (float(C)*defs.k_t/defs.c_t - self.seq_cost))
+        # # Check if if permutation will cause stalls to happen
+        # if stage_cost < self.seq_cost:
+        #     # Schedule with stages
+        #     self.seq2stall = max(0, self.seq2_cost + stage_cost - self.seq_cost)
+        # else:
+        #     # Schedule on with seq
+        #     self.seq2stall = max(0, self.seq2_cost + self.seq_cost - stage_cost)
 
+        # if defs.ntt_type == 'opt':
+        #     print defs.cycle_time, "\t", self.stage_cost, self.seq_cost, self.seq2_cost, self.pipe_choice, "\t", self.ntt_choice, f1_cost, opt_cost
+        # else:
+        #     print defs.cycle_time, "\t", self.stage_cost, self.seq_cost, self.seq2_cost, self.pipe_choice, "\t", self.ntt_choice, f1_cost
 
         # if defs.ntt_type == 'opt':
         #     print defs.cycle_time, "\t", self.seq_cost, self.seq2_cost, "\t", self.seq_stall, self.seq2stall, "\t", self.ntt_choice, f1_cost, opt_cost
@@ -334,9 +341,8 @@ class Chiplet(elements.PE_Basic):
     def run_hyena_k(self):
         
         for k in range(defs.k_t):
-            self.pipeline_counts += 1
-
-            # TODO: Is there an extra access that I have to make? Yes for c1, essentially double wt accesses from memory
+            if self.pipe_choice == 'mult':
+                self.pipeline_counts += 1
 
             if self.ntt_choice != 'opt':
                 self.pe_array.op_ntt_f1("wt")
@@ -348,11 +354,17 @@ class Chiplet(elements.PE_Basic):
                 self.pe_array.op_ntt_opt("wt")
                 self.pe_array.op_mul_if_wt()
 
+            # Access the ksh for the next rotation
+            self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size
+
     # Collate all psums present in it
     # This will be performed on a different set of hardware and so can happen in the background
     # If run_hyena_k finishes before this, then it has to wait until this is complete before we can proceed
     # TODO: This will have some extra copies happening -- heck all stages will have some extra back and forth
     def run_hyena_psum_collect(self, rsct):
+
+        if self.pipe_choice == 'psum':
+            self.pipeline_counts += 1
         
         if self.ntt_choice != 'opt':
             self.pe_array.op_ntt_f1("psum")
@@ -363,9 +375,6 @@ class Chiplet(elements.PE_Basic):
             self.pe_array.op_psum_rotate()
             self.pe_array.op_ntt_f1("psum")
             self.pe_array.op_ksh_psum(rsct)    
-            # TODO: Confirm why this can be done again, Also as we are doing it on 1 value can that be exploited?
-            #       Will there be the same number of accesses or will it be a little less?
-            #       How can that be optimised for the next case? Or can it not be done for that?
         else:
             self.pe_array.op_ntt_f1("psum")
             self.pe_array.op_psum_rotate()
@@ -373,8 +382,6 @@ class Chiplet(elements.PE_Basic):
             for _ in range(rsct):
                 self.pe_array.op_ntt_opt("psum")
                 self.pe_array.op_ksh_psum()
-
-        self.cycles += self.seq_stall
         
 
     # Permute the IF
@@ -388,7 +395,12 @@ class Chiplet(elements.PE_Basic):
         self.pe_array.op_ntt_f1("if")
         self.pe_array.op_ksh_if()
 
-        self.cycles += self.seq2stall
+        # # As scheduling the permutes can reduce the number of stalls we see
+        # self.cycles += abs(self.seq2stall - self.seq_stall) - self.seq_stall
+        # self.stalls += abs(self.seq2stall - self.seq_stall) - self.seq_stall
 
     def calc_time_hyena(self):
-        self.cycles += self.pipeline_counts + len(self.stages)
+        if self.pipe_choice == 'mult':
+            self.cycles = self.pipeline_counts
+        elif self.pipe_choice == 'psum':
+            self.cycles = self.pipeline_counts

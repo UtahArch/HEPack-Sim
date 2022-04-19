@@ -68,28 +68,6 @@ class PE(elements.PE_Basic):
     def op_ksh_psum(self, iters=1):
         self.update_ksh_psum(iters)
         self.ksh_stats.update_ksh_psum(iters)
-
-    
-    # # Once PSUM is decoded then rotate and accumulate all values
-    # # Since this is encryped we require KSH for this
-    # # TODO: Confirm this, what happens to the acculuated data at the end
-    # # for iter times                Order
-    # #       1. R KSH                
-    # #       2. Shift PSUM           1 2 3
-    # #       3. R PSUM               4 5
-    # #       4. MUL KSH PSUM 
-    # #       5. Accumulate
-    # def op_ksh_psum_acc_cycles(self, iters):
-    #     CYCLE_COUNT = 0
-    #     # Calculate Time Taken based on the order in the comments
-    #     CYCLE_COUNT += max(self.psum_file.read_time, self.ksh_file.read_time)
-    #     CYCLE_COUNT += max(self.muls.exec_time, self.adds.exec_time)
-    #     # Since there are iter MACs followed by accumulates
-    #     CYCLE_COUNT = iters * CYCLE_COUNT
-
-    # def op_ksh_psum_acc(self, iters):
-    #     self.update_ksh_psum_acc(iters)
-    #     self.ksh_stats.update_ksh_psum_acc(iters)
     
     
     # For performing permutation on IF KSH is going to be required
@@ -98,7 +76,7 @@ class PE(elements.PE_Basic):
     # 
     # 1. R IF                       1 2 
     # 2. R KSH                      3   
-    # 3. MUL IFT IF KSH             4           # TODO: Check if there is no accumulate is happening
+    # 3. MUL IFT IF KSH             4           
     # 4. ST IF IFT                  
     #        
     def op_ksh_if_cycles(self):
@@ -117,6 +95,11 @@ class PE(elements.PE_Basic):
     # Rotates for F1 Arch are done by Internal Permute -> Transpose -> Internal Permute
     # Here defs.rotation caputres the time taken by the transpose unit while the internal permutes are considered free
     # Rotates for Hyena Arch use the Benes network and defs.rotation caputers that
+
+    # TODO: Confirm this
+    # For multiple chiplets, the hops just increase the number of stages and do not increase the cycle time
+    # That is why the only change is going to come during shifts
+    # --
     
     # Rotate Psums after muls and send last B and recieve new 1st B
     # This stage is what requires op_mul_psum_ksh to happen
@@ -130,8 +113,6 @@ class PE(elements.PE_Basic):
     
     # Rotate Wts after having used them in muls
     # We don't need KSH after this as wts are not encrypted
-    # ... will this be shifts or perms ... perms for now
-    # TODO: Even for the case of not doing opt_ntt, do we permute or do shifts?
     def op_wt_rotate_cycles(self):        
         return defs.rotation
 
@@ -233,27 +214,12 @@ class PE(elements.PE_Basic):
     
     def op_ntt_f1(self, mode):
         self.op_ntt_baseline(mode, int(math.sqrt(defs.poly_n)))
-
-    # # Transpose for NTT
-    # # This is of the form of permute -> transpose (which is a rotation) -> permute
-    # # The permute time can be hidden with the previous and next stages
-    # # TODO: Add regs read and write time into permute and rotations
-    # def op_ntt_f1_permute_cycles(self, mode):
-    #     return defs.rotation # TODO: Confirm and Parametrise this number
-    
-    # # TODO: Does Rotation actually increase the number of accesses by a lot?
-    # # TODO: This will change a lot of rotation accesses, based on arch
-    # def op_ntt_f1_permute(self, mode):
-    #     self.update_ntt_f1_permute(mode)
-    #     # TODO: Is this part of ROT or NTT?
-    #     self.ntt_stats.update_ntt_f1_permute(mode)
         
 
     # Run optimised NTT
     # For 1 shift : f(x) * NTT(x) + c1
-    #               reg   twicoef  ????
+    #               reg     HardCoded 
     # For stride this is going to repeat stride times
-    # TODO: What happens to twicoef? Is it c1? Then there will be an extra access to that to store the value right?
     def op_ntt_opt_cycles(self, mode, stride=1):
 
         if mode == 'psum':
@@ -267,7 +233,7 @@ class PE(elements.PE_Basic):
             exit()
         
         # Read from regfile at the start and write to it in the end, therefore it does not come into the picture
-        return (self.muls.exec_time + self.adds.exec_time) * stride + max(reg_file.read_time, self.twicoef.read_time)
+        return (self.muls.exec_time + self.adds.exec_time) * stride + reg_file.read_time
     
     def op_ntt_opt(self, mode, stride=1):
         self.update_ntt_opt(mode, stride)

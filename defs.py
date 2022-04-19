@@ -18,10 +18,10 @@ arch       = "f1"
 num_muls   = None
 poly_n     = 1024
 batch_size = 1
-
 num_chiplets  = None
 
 # Arch Choices
+pe_size        = 1024
 # TODO: Confirm and Parameterise
 rotation_f1    = 64     # Rotation for n = 1024 
 rotation_hyena = 1      # Benes network FTW!
@@ -30,8 +30,6 @@ rotation       = None
 # Processor
 cycle_time = None     # In Ticks
 tick_time  = 5        # In ns
-
-# TODO: Multiply with 16 because it is monolythic
 
 # PE
 
@@ -72,7 +70,7 @@ twicoef_write   = 0
 ## L2 Caches
 max_c_on_chiplt   = 512
 max_ksh_on_chiplt = 1024
-max_wt_on_chiplt  = 4096
+max_wt_on_chiplt  = 512
 
 ### IFs
 if_l2_size  = if_file_size * max_c_on_chiplt
