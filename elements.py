@@ -107,15 +107,15 @@ class PE_Basic:
 
     # Functions to update stats corresponding to op_* defined in funcs.py
     
-    def update_mul_if_wt(self):
+    def update_mul_if_wt(self, iters):
         # Access values from where they are stored
-        self.if_file.stats_accesses += self.if_file.size
-        self.wt_file.stats_accesses += self.wt_file.size
+        self.if_file.stats_accesses += self.if_file.size * iters
+        self.wt_file.stats_accesses += self.wt_file.size * iters
         # Multiply the values
-        self.muls.stats_accesses += self.muls.num
+        self.muls.stats_accesses += self.muls.num * iters
 
         # Stats
-        self.calls  += 1
+        self.calls  += iters
 
     # Perform NTT on a specific file
     def update_ntt_baseline(self, mode, steps):

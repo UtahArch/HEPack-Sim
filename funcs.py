@@ -34,7 +34,7 @@ class PE(elements.PE_Basic):
     # 2. R WT                       3     
     # 3. MUL PTemp IF WT                   
     # 
-    def op_mul_if_wt_cycles(self):
+    def op_mul_if_wt_cycles(self, iters=1):
         CYCLE_COUNT = 0
         # Calculate Time Taken based on the order in the comments
         CYCLE_COUNT += max(self.if_file.read_time, self.wt_file.read_time)
@@ -42,9 +42,9 @@ class PE(elements.PE_Basic):
 
         return CYCLE_COUNT
 
-    def op_mul_if_wt(self):
-        self.update_mul_if_wt()
-        self.mul_stats.update_mul_if_wt()
+    def op_mul_if_wt(self, iters=1):
+        self.update_mul_if_wt(iters)
+        self.mul_stats.update_mul_if_wt(iters)
 
     
     # Multiply PSUM with KSH to work for rotation

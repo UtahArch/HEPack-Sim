@@ -1,3 +1,4 @@
 data/
+data_*
 temp*
 *.pyc

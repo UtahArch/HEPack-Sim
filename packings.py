@@ -31,6 +31,8 @@ class Chiplet(elements.PE_Basic):
         self.stages = None
         self.seq    = None
         self.seq2   = None
+        self.seq_s  = None
+        self.seq2_s = None
         self.stage_cost  = None
         self.seq_cost  = None
         self.seq2_cost = None
@@ -40,9 +42,10 @@ class Chiplet(elements.PE_Basic):
     def print_stats_console(self, IF, W):
         print IF[0], IF[1], IF[2]
         print W[0], W[1], W[2], W[3]
-        for x in self.stages:
-            print x[0], x[1], "::",
-        print
+        if defs.packing != 'ngraph':
+            for x in self.stages:
+                print x[0], x[1], "::",
+            print
         if self.seq != None:
             for x in self.seq:
                 print x[0], x[1], "::",
@@ -50,7 +53,7 @@ class Chiplet(elements.PE_Basic):
             for x in self.seq2:
                 print x[0], x[1], "::",
             print
-            print self.stage_cost, self.seq_cost, self.seq2_cost, "\t", self.pipe_choice
+            print self.stage_cost, self.seq_cost, self.seq2_cost, "\t", self.seq_s, self.seq2_s, "\t", self.pipe_choice
 
         print defs.k_t, defs.c_t, defs.packing, defs.ntt_type, defs.arch, defs.batch_size, defs.poly_n, defs.num_chiplets, defs.rotation, self.ntt_choice, defs.cycle_time
         print("=== Stats ===")
@@ -77,8 +80,8 @@ class Chiplet(elements.PE_Basic):
         self.pe_array.ksh_stats.print_ksh_stats()
         self.pe_array.rot_stats.print_rot_stats()
 
-    def print_stats_file(self, IF, W, name):
-        output_path = "data/{}_{}_{}/{}_{}_{}_{}_{}_{}_{}.data".format(defs.packing, defs.ntt_type, defs.arch, name, IF[0], IF[1], W[0], W[1], W[2], W[3])
+    def print_stats_file(self, IF, W, name, network):
+        output_path = "data_{}/{}_{}_{}/{}_{}_{}_{}_{}_{}_{}.data".format(network, defs.packing, defs.ntt_type, defs.arch, name, IF[0], IF[1], W[0], W[1], W[2], W[3])
         print output_path
 
         stout_save = sys.stdout
@@ -275,7 +278,9 @@ class Chiplet(elements.PE_Basic):
                 ("I2P",self.pe_array.op_ntt_f1_cycles("psum")),
                 ("KSH",self.pe_array.op_ksh_psum_cycles()),
             ]
-            self.seq_cost  = (rsct) * max([x[1] for x in self.seq])
+            self.seq_cost  = (rsct + 3) * max([x[1] for x in self.seq])
+            # One-Time Cost
+            self.seq_s = 0 # As it is always going to be hidden behind the RSC_t partial sums
         
         else:
             # NTT -> RSCt pipeline of OPNTT-KSH
@@ -288,11 +293,11 @@ class Chiplet(elements.PE_Basic):
             ]
             
             # 3 steps for NTT and 2*RSCt times for OPNTT-KSH which can be pipelined
-            # TODO: Confirm this 3 should be bigger, or weight, this goes into the previous pipeline
-            self.seq_cost  = (rsct) * self.seq[3][1]
+            self.seq_cost  = (rsct)*self.seq[3][1] + (self.seq[0][1] + self.seq[1][1] + self.seq[2][1])
+            # One-Time Cost is going to be a thing only if the NTT takes longer than the RSCt partial sums
+            self.seq_s = int((self.seq[0][1] + self.seq[1][1] + self.seq[2][1]) / float(rsct)*self.seq[3][1]) * (rsct)*self.seq[3][1]
 
         # IF Permutation is a separate sequence
-        # TODO: Model the cost of this as well
         self.seq2 = [
             ("N1I",self.pe_array.op_ntt_f1_cycles("if")),
             ("T1I",self.pe_array.op_if_rotate_cycles()),
@@ -303,9 +308,7 @@ class Chiplet(elements.PE_Basic):
             ("I2I",self.pe_array.op_ntt_f1_cycles("if")),
             ("KSH",self.pe_array.op_ksh_if_cycles()),
         ]
-
-        self.seq2_cost = 8 * max([x[1] for x in self.seq2])
-
+        self.seq2_cost = sum([x[1] for x in self.seq2])
 
         # print self.stages
         # print self.seq
@@ -317,8 +320,22 @@ class Chiplet(elements.PE_Basic):
             defs.cycle_time = max([x[1] for x in self.stages])
         else:
             self.pipe_choice = 'psum'
-            defs.cycle_time = max([x[1] for x in self.seq])        
+            defs.cycle_time = self.seq[3][1]
+        
+        # As we can hide some of the cost behind one of the pipelines
+        # TODO: Will need to have a big NTT unit in both hardwares to handle pipe_choice = 'psum' cases
+        if self.pipe_choice == 'mult':
+            if defs.ntt_type == 'opt':
+                temp = (int(math.ceil(self.seq2_cost/float(rsct)*self.seq[3][1])) * (rsct)*self.seq[3][1])
+                self.seq2_s = max(0, self.seq_s + (rsct)*self.seq[3][1] + temp - self.stage_cost)
+            else:
+                self.seq2_s = max(0, self.seq_cost + self.seq2_cost - self.stage_cost)
+        else:
+            self.seq2_s =  max(self.seq2_cost - abs(self.seq_cost - self.stage_cost), 0)
 
+        self.seq_s = int(math.ceil(self.seq_s/float(defs.cycle_time)))
+        self.seq2_s = int(math.ceil(self.seq2_s/float(defs.cycle_time)))
+        
         # # Check if if permutation will cause stalls to happen
         # if stage_cost < self.seq_cost:
         #     # Schedule with stages
@@ -365,6 +382,8 @@ class Chiplet(elements.PE_Basic):
 
         if self.pipe_choice == 'psum':
             self.pipeline_counts += 1
+            self.cycles += self.seq_s
+            self.stalls += self.seq_s
         
         if self.ntt_choice != 'opt':
             self.pe_array.op_ntt_f1("psum")
@@ -386,6 +405,9 @@ class Chiplet(elements.PE_Basic):
 
     # Permute the IF
     def run_hyena_permute_if(self):
+        self.cycles += self.seq2_s
+        self.stalls += self.seq2_s
+
         self.pe_array.op_ntt_f1("if")
         self.pe_array.op_if_rotate()
         self.pe_array.op_ntt_f1("if")
@@ -401,6 +423,33 @@ class Chiplet(elements.PE_Basic):
 
     def calc_time_hyena(self):
         if self.pipe_choice == 'mult':
-            self.cycles = self.pipeline_counts
+            self.cycles += self.pipeline_counts
         elif self.pipe_choice == 'psum':
-            self.cycles = self.pipeline_counts
+            self.cycles += self.pipeline_counts
+
+
+    # NGraph-HE Packing
+    
+    ## NGraph is only going to be limited by the number of multiplications it can do
+    def setup_ngraph(self):
+        defs.cycle_time = self.pe_array.op_mul_if_wt_cycles()
+    
+    ## Run for all wts
+    def run_ngraph(self, runs):
+        
+        # Get IFs from L2 and Wts from Mem
+        self.pe_array.if_file.stats_accesses += runs * self.pe_array.if_file.size
+        self.pe_array.pip_stats.if_file.stats_accesses += runs *  self.pe_array.if_file.size
+        self.if_l2_cache.stats_accesses += runs * self.pe_array.if_file.size
+        # self.memory.stats_accesses += runs * self.pe_array.if_file.size
+        
+        self.pe_array.wt_file.stats_accesses += runs * self.pe_array.wt_file.size
+        self.pe_array.pip_stats.wt_file.stats_accesses += runs * self.pe_array.wt_file.size
+        # self.pe_array.wt_l2_cache.stats_accesses += runs * self.pe_array.wt_file.size
+        self.memory.stats_accesses += runs * self.pe_array.wt_file.size
+
+        self.pipeline_counts += runs
+        self.pe_array.op_mul_if_wt(runs)
+    
+    def calc_time_ngraph(self):
+        self.cycles = self.pipeline_counts

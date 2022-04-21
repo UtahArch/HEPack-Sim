@@ -16,15 +16,16 @@ console_print = False
 if console_print:
     os.system('clear')
 
-ntttype  = sys.argv[1]
-arch     = sys.argv[2]
+network  = sys.argv[1]
+ntttype  = sys.argv[2]
+arch     = sys.argv[3]
 poly_n   = 1024
 num_muls = 1
 batch    = 1
 
 done_params = set()
 
-with open("Resnet50_model.m") as fin:
+with open("{}.m".format(network)) as fin:
     for line in fin.readlines():
         if "Layer" in line:
             name = line.split()[1]
@@ -102,22 +103,23 @@ with open("Resnet50_model.m") as fin:
             # Loop to finish all XYs of the IF
             for if_step in range(0, XY, XY_t):
                 
-                if W[2]/C_t <= defs.max_c_on_chiplt:
-                    main_chiplet.memory.stats_accesses += defs.if_file_size * min(defs.max_c_on_chiplt, W[2]/C_t)
-                    main_chiplet.if_l2_cache.stats_accesses += defs.if_file_size * min(defs.max_c_on_chiplt, W[2]/C_t)
-                else:
-                    print("\t[ERROR] Handle This Case!!!")
-                    exit()
+                # Store C/C_t ifs in L2, the rest will have to handled from memory
+                main_chiplet.memory.stats_accesses += defs.if_file_size * min(defs.max_c_on_chiplt, W[2]/C_t)
+                main_chiplet.if_l2_cache.stats_accesses += defs.if_file_size * min(defs.max_c_on_chiplt, W[2]/C_t)
 
                 # Loop to finish all Kernels
                 for k in range(W[3]):
+                    iters_if = 0
                     # Loop to finish all Channels
                     # print if_step, k
                     for c_step in range(0, W[2], C_t):
                         # print("Running Iters {} : {} {} {}".format(i, if_step, k_step, c_step))
                         main_chiplet.pe_array.if_file.stats_accesses += main_chiplet.pe_array.if_file.size
                         main_chiplet.pe_array.pip_stats.if_file.stats_accesses += main_chiplet.pe_array.if_file.size
-                        main_chiplet.if_l2_cache.stats_accesses += main_chiplet.pe_array.if_file.size
+                        if iters_if < defs.max_c_on_chiplt:
+                            main_chiplet.if_l2_cache.stats_accesses += main_chiplet.pe_array.if_file.size
+                        else:
+                            main_chiplet.memory.stats_accesses += main_chiplet.pe_array.if_file.size
 
                         # break
                         # print if_step, k, c_step
@@ -137,4 +139,4 @@ with open("Resnet50_model.m") as fin:
                 main_chiplet.print_stats_console(IF, W)
                 break
             else:
-                main_chiplet.print_stats_file(IF, W, name)
+                main_chiplet.print_stats_file(IF, W, name, network)

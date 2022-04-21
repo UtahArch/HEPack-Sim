@@ -41,9 +41,10 @@ with open("{}.m".format(network)) as fin:
         elif "Dimensions" in line:
             param = {}
             # if console_print:
-            #     # line = "Dimensions { K: 1, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
-            #     # line = "Dimensions { K: 512, C: 512, R: 3, S: 3, Y: 7, X: 7 }"
-            #     line = "Dimensions { K: 1, C: 1024, R: 1, S: 1, Y: 14, X: 14 }"
+            #     S = [1,1]
+            #     line = "Dimensions { K: 24, C: 96, R: 1, S: 1, Y:56, X:56 }"
+                # line = "Dimensions { K: 1, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
+                # line = "Dimensions { K: 64, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
 
             if console_print:
                 if line in done_params:
@@ -96,8 +97,9 @@ with open("{}.m".format(network)) as fin:
             Mt = int(math.ceil(Mt/float(C_t_new)))
             C_t *= C_t_new
             if console_print:
-                print "IF Packing:      P:{}\tM:{}\tRS:{}\tMt:{}\tC_t:{}\t:: {}".format(P, M, RS, Mt, C_t, Mt*RS*C_t/float(n))
-                print "Wt Packing:     K_t:{}\tC_t_new:{}\t\t\t:: {}".format(K_t, C_t_new, RS*C_t*K_t/float(n))
+                # print "IF Packing:      P:{}\tM:{}\tRS:{}\tMt:{}\tC_t:{}\t:: {}".format(P, M, RS, Mt, C_t, Mt*RS*C_t/float(n))
+                # print "Wt Packing:     K_t:{}\tC_t_new:{}\t\t\t:: {}".format(K_t, C_t_new, RS*C_t*K_t/float(n))
+                print K_t
 
             # Define Classes
             defs.c_t = C_t
@@ -124,7 +126,8 @@ with open("{}.m".format(network)) as fin:
             main_chiplet = packings.Chiplet()
             main_chiplet.setup_hyena(RS*C_t, W[2], W[3])
 
-            continue
+            if console_print:
+                continue
 
             # Bring Values to KSH and twiddle
             # For optimised NTT Twiddle carries the hints
@@ -137,20 +140,27 @@ with open("{}.m".format(network)) as fin:
             
             # TODO: Confirm this ; also since its iso-area can't we give more cache space to this?
             # num_k_memory = max(0, W[2]/C_t * W[3]/K_t - defs.max_c_on_chiplt)
-            if W[2]/C_t > defs.max_c_on_chiplt:
-                print "Handle this case for ifs"
-                exit()
+            # if W[2]/C_t > defs.max_c_on_chiplt:
+            #     print "Handle this case for ifs"
+            #     exit()
             # print W[2]/C_t * W[3]/K_t, defs.max_wt_on_chiplt
+
+            # Fill the L2 cache with wts, we will also have to account for coeff format accesses for opt_ntt's case
+            if defs.ntt_type == 'opt':
+                scale = 1 + float(RS*C_t)/defs.pe_size
+            else:
+                scale = 1
             
             for m_step in range(0, M, Mt):              # Iterate over all non-overlapping matrices
                 # Get the if from memory and put it in the L2 for the first iteration
+                # TODO: Do we even need an IF cache?
                 main_chiplet.memory.stats_accesses += main_chiplet.pe_array.if_file.size
                 main_chiplet.if_l2_cache.stats_accesses += main_chiplet.pe_array.if_file.size
 
-                # Fill the L2 cache with wts
+                # Fill the L2 cache with wts, we will also have to account for coeff format accesses for opt_ntt's case
                 # Store C/C_t x K/K_t wts in the L2, the rest will have to be handled from memory
-                main_chiplet.memory.stats_accesses += main_chiplet.pe_array.wt_file.size * min(defs.max_wt_on_chiplt, W[2]/C_t * W[3]/K_t)
-                main_chiplet.wt_l2_cache.stats_accesses += main_chiplet.pe_array.wt_file.size * min(defs.max_wt_on_chiplt, W[2]/C_t * W[3]/K_t)
+                main_chiplet.memory.stats_accesses += int(math.ceil(main_chiplet.pe_array.wt_file.size * min(defs.max_wt_on_chiplt, scale * W[2]/C_t * W[3]/K_t)))
+                main_chiplet.wt_l2_cache.stats_accesses += int(math.ceil(main_chiplet.pe_array.wt_file.size * min(defs.max_wt_on_chiplt, scale * W[2]/C_t * W[3]/K_t)))
 
                 for p in range((W[0]-1)*(W[1]-1)/(S[0]*S[1]) + 1):  # Permute to create all overlappingmatrices
 
@@ -158,7 +168,7 @@ with open("{}.m".format(network)) as fin:
                     for k_step in range(0, W[3], K_t):        # Iterate over all kernels in K_t steps for wts
                         for c_step in range(0, W[2], C_t):    # Iterate over all channels in C_t steps for wts
                             # Access wts from the L2 or memory based on number
-                            if iters < defs.max_wt_on_chiplt:
+                            if scale * iters < defs.max_wt_on_chiplt:
                                 main_chiplet.wt_l2_cache.stats_accesses += main_chiplet.pe_array.wt_file.size
                             else:
                                 main_chiplet.memory.stats_accesses += main_chiplet.pe_array.wt_file.size
@@ -197,4 +207,4 @@ with open("{}.m".format(network)) as fin:
                 main_chiplet.print_stats_console(IF, W)
                 break
             else:
-                main_chiplet.print_stats_file(IF, W, name)
+                main_chiplet.print_stats_file(IF, W, name, network)
