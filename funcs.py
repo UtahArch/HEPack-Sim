@@ -98,8 +98,9 @@ class PE(elements.PE_Basic):
 
     # TODO: Confirm this
     # For multiple chiplets, the hops just increase the number of stages and do not increase the cycle time
-    # That is why the only change is going to come during shifts
-    # --
+    # That is why the only change is going to come during shifts, as psum collection and wt rotation are shifts
+    # they also would do not affect the cycle time when ntt-opt causes the cycle time to be very small
+    # The only assumption here is that we have sufficient internal bandwidth to allow the hops to be pipelined
     
     # Rotate Psums after muls and send last B and recieve new 1st B
     # This stage is what requires op_mul_psum_ksh to happen

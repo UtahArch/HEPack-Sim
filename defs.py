@@ -29,13 +29,13 @@ rotation       = None
 
 # Processor
 cycle_time = None     # In Ticks
-tick_time  = 5        # In ns
+# tick_time  = 5        # In ns
 
 # PE
 
 ## MACs
 mac_num         = poly_n*2
-mul_exec_time   = 1     # In Cycles
+mul_exec_time   = 5     # In Cycles
 add_exec_time   = 0     
 
 ## L1 Caches

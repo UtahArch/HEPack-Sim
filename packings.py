@@ -39,9 +39,10 @@ class Chiplet(elements.PE_Basic):
         self.pipe_choice = None
 
         
-    def print_stats_console(self, IF, W):
+    def print_stats_console(self, IF, W, S):
         print IF[0], IF[1], IF[2]
         print W[0], W[1], W[2], W[3]
+        print S[0], S[1]
         if defs.packing != 'ngraph':
             for x in self.stages:
                 print x[0], x[1], "::",
@@ -70,6 +71,7 @@ class Chiplet(elements.PE_Basic):
         # print("Total Permutations :\t{}".format(self.pe_array.permt))
         print("=== Chiplet Stats ===")
         # self.pe_array.print_pe_stats()
+        self.wt_l2_cache.print_stats()
         self.if_l2_cache.print_stats()
         self.ksh_l2_cache.print_stats()
         self.memory.print_stats()
@@ -80,13 +82,13 @@ class Chiplet(elements.PE_Basic):
         self.pe_array.ksh_stats.print_ksh_stats()
         self.pe_array.rot_stats.print_rot_stats()
 
-    def print_stats_file(self, IF, W, name, network):
-        output_path = "data_{}/{}_{}_{}/{}_{}_{}_{}_{}_{}_{}.data".format(network, defs.packing, defs.ntt_type, defs.arch, name, IF[0], IF[1], W[0], W[1], W[2], W[3])
+    def print_stats_file(self, IF, W, S, name, network):
+        output_path = "data_{}/{}_{}_{}_{}/{}_{}_{}_{}_{}_{}_{}.data".format(network, defs.packing, defs.ntt_type, defs.arch, defs.poly_n, name, IF[0], IF[1], W[0], W[1], W[2], W[3])
         print output_path
 
         stout_save = sys.stdout
         sys.stdout = open(output_path, 'w')
-        self.print_stats_console(IF, W)
+        self.print_stats_console(IF, W, S)
         sys.stdout.close()
         sys.stdout = stout_save
     
@@ -145,8 +147,12 @@ class Chiplet(elements.PE_Basic):
             self.pe_array.op_psum_rotate()
             self.pe_array.op_ntt_f1("psum")
             self.pe_array.op_ksh_psum()
-            
-            self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size
+
+            # Access the ksh for the next rotation
+            if defs.num_chiplets == 1:
+                self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size
+            else:
+                self.memory.stats_accesses += self.pe_array.ksh_file.size
 
     def calc_time_cheetah(self):
         self.cycles = self.pipeline_counts
@@ -212,7 +218,10 @@ class Chiplet(elements.PE_Basic):
             self.pe_array.op_ksh_psum()
 
             # Access the ksh for the next rotation
-            self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size
+            if defs.num_chiplets == 1:
+                self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size
+            else:
+                self.memory.stats_accesses += self.pe_array.ksh_file.size
 
     def calc_time_epic(self):
         self.cycles = self.pipeline_counts
@@ -295,7 +304,7 @@ class Chiplet(elements.PE_Basic):
             # 3 steps for NTT and 2*RSCt times for OPNTT-KSH which can be pipelined
             self.seq_cost  = (rsct)*self.seq[3][1] + (self.seq[0][1] + self.seq[1][1] + self.seq[2][1])
             # One-Time Cost is going to be a thing only if the NTT takes longer than the RSCt partial sums
-            self.seq_s = int((self.seq[0][1] + self.seq[1][1] + self.seq[2][1]) / float(rsct)*self.seq[3][1]) * (rsct)*self.seq[3][1]
+            self.seq_s = int((self.seq[0][1] + self.seq[1][1] + self.seq[2][1]) / (float(rsct)*self.seq[3][1])) * (rsct)*self.seq[3][1]
 
         # IF Permutation is a separate sequence
         self.seq2 = [
@@ -320,13 +329,16 @@ class Chiplet(elements.PE_Basic):
             defs.cycle_time = max([x[1] for x in self.stages])
         else:
             self.pipe_choice = 'psum'
-            defs.cycle_time = self.seq[3][1]
+            if defs.ntt_type == 'opt':
+                defs.cycle_time = self.seq[3][1]
+            else:
+                defs.cycle_time = max([x[1] for x in self.seq[3:]])
         
         # As we can hide some of the cost behind one of the pipelines
         # TODO: Will need to have a big NTT unit in both hardwares to handle pipe_choice = 'psum' cases
         if self.pipe_choice == 'mult':
             if defs.ntt_type == 'opt':
-                temp = (int(math.ceil(self.seq2_cost/float(rsct)*self.seq[3][1])) * (rsct)*self.seq[3][1])
+                temp = (int(math.ceil(self.seq2_cost/(float(rsct)*self.seq[3][1]))) * (rsct)*self.seq[3][1])
                 self.seq2_s = max(0, self.seq_s + (rsct)*self.seq[3][1] + temp - self.stage_cost)
             else:
                 self.seq2_s = max(0, self.seq_cost + self.seq2_cost - self.stage_cost)
@@ -372,7 +384,10 @@ class Chiplet(elements.PE_Basic):
                 self.pe_array.op_mul_if_wt()
 
             # Access the ksh for the next rotation
-            self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size
+            if defs.num_chiplets == 1:
+                self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size
+            else:
+                self.memory.stats_accesses += self.pe_array.ksh_file.size
 
     # Collate all psums present in it
     # This will be performed on a different set of hardware and so can happen in the background

@@ -101,7 +101,7 @@ with open("{}.m".format(network)) as fin:
             main_chiplet.calc_time_ngraph()
 
             if console_print:
-                main_chiplet.print_stats_console(IF, W)
+                main_chiplet.print_stats_console(IF, W, S)
                 break
             else:
-                main_chiplet.print_stats_file(IF, W, name, network)
+                main_chiplet.print_stats_file(IF, W, S, name, network)

@@ -22,7 +22,7 @@ if console_print:
 network  = sys.argv[1]
 ntttype  = sys.argv[2]
 arch     = sys.argv[3]
-poly_n   = 1024
+poly_n   = int(sys.argv[4])*1024
 num_muls = 1
 batch    = 1
 
@@ -40,9 +40,11 @@ with open("{}.m".format(network)) as fin:
             # print S, line
         elif "Dimensions" in line:
             param = {}
-            # if console_print:
-            #     S = [1,1]
-            #     line = "Dimensions { K: 24, C: 96, R: 1, S: 1, Y:56, X:56 }"
+            if console_print:
+                S = [1,1]
+                # line = "Dimensions { K: 24, C: 96, R: 1, S: 1, Y:56, X:56 }"
+                line = 'Dimensions { K: 1, C: 96, R: 3, S: 3, Y:56, X:56 }'
+                # line = 'Dimensions { K: 256, C: 64, R: 1, S: 1, Y: 56, X: 56 }'
                 # line = "Dimensions { K: 1, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
                 # line = "Dimensions { K: 64, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
 
@@ -63,6 +65,7 @@ with open("{}.m".format(network)) as fin:
             IF = (param['X'], param['Y'], param['C'])
             W  = (param['R'], param['S'], param['C'], param['K'])
 
+            defs.poly_n = poly_n
             # IF Packing
             P  = (IF[0] - W[0] + 1)*(IF[1] - W[1] + 1) / (S[0]*S[1])      # Total Number of Matrices
             M  = min(P, int(math.ceil(IF[0]/W[0])*math.ceil(IF[1]/W[1]))) # Number of non-overlapping Matrices
@@ -97,9 +100,9 @@ with open("{}.m".format(network)) as fin:
             Mt = int(math.ceil(Mt/float(C_t_new)))
             C_t *= C_t_new
             if console_print:
-                # print "IF Packing:      P:{}\tM:{}\tRS:{}\tMt:{}\tC_t:{}\t:: {}".format(P, M, RS, Mt, C_t, Mt*RS*C_t/float(n))
-                # print "Wt Packing:     K_t:{}\tC_t_new:{}\t\t\t:: {}".format(K_t, C_t_new, RS*C_t*K_t/float(n))
-                print K_t
+                print "IF Packing:      P:{}\tM:{}\tRS:{}\tMt:{}\tC_t:{}\t:: {}".format(P, M, RS, Mt, C_t, Mt*RS*C_t/float(n))
+                print "Wt Packing:     K_t:{}\tC_t_new:{}\t\t\t:: {}".format(K_t, C_t_new, RS*C_t*K_t/float(n))
+                # print K_t
 
             # Define Classes
             defs.c_t = C_t
@@ -126,8 +129,8 @@ with open("{}.m".format(network)) as fin:
             main_chiplet = packings.Chiplet()
             main_chiplet.setup_hyena(RS*C_t, W[2], W[3])
 
-            if console_print:
-                continue
+            # if console_print:
+            #     continue
 
             # Bring Values to KSH and twiddle
             # For optimised NTT Twiddle carries the hints
@@ -204,7 +207,7 @@ with open("{}.m".format(network)) as fin:
             main_chiplet.calc_time_hyena()
 
             if console_print:
-                main_chiplet.print_stats_console(IF, W)
+                main_chiplet.print_stats_console(IF, W, S)
                 break
             else:
-                main_chiplet.print_stats_file(IF, W, name, network)
+                main_chiplet.print_stats_file(IF, W, S, name, network)

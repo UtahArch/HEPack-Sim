@@ -11,7 +11,7 @@ import packings
 import sys
 import os
 
-console_print = True
+console_print = False
 
 if console_print:
     os.system('clear')
@@ -19,7 +19,7 @@ if console_print:
 network  = sys.argv[1]
 ntttype  = sys.argv[2]
 arch     = sys.argv[3]
-poly_n   = 1024
+poly_n   = int(sys.argv[4])*1024
 num_muls = 1
 batch    = 1
 
@@ -29,10 +29,16 @@ with open("{}.m".format(network)) as fin:
     for line in fin.readlines():
         if "Layer" in line:
             name = line.split()[1]
+            S = [1,1]
+        if "Stride" in line:
+            temp = line.split("{")[1].split("}")[0].split(",")
+            S[0] = int(temp[0].split(":")[-1].strip())
+            S[1] = int(temp[1].split(":")[-1].strip())
         elif "Dimensions" in line:
             param = {}
             if console_print:
-                line = "Dimensions { K: 24, C: 96, R: 1, S: 1, Y:56, X:56 }"
+                # line = "Dimensions { K: 24, C: 96, R: 1, S: 1, Y:56, X:56 }"
+                line = 'Dimensions { K: 1, C: 96, R: 3, S: 3, Y:56, X:56 }'
                 # line = "Dimensions { K: 512, C: 512, R: 3, S: 3, Y: 7, X: 7 }"
                 # line = "Dimensions { K: 64, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
 
@@ -54,6 +60,8 @@ with open("{}.m".format(network)) as fin:
             # To decide C_t and XY_t - IF Packing
             C_t = 1
             XY = IF[0] * IF[1]
+
+            defs.poly_n = poly_n
 
             if XY < defs.poly_n:
                 XY_t = XY
@@ -163,7 +171,7 @@ with open("{}.m".format(network)) as fin:
             main_chiplet.calc_time_epic()
 
             if console_print:
-                main_chiplet.print_stats_console(IF, W)
+                main_chiplet.print_stats_console(IF, W, S)
                 break
             else:
-                main_chiplet.print_stats_file(IF, W, name, network)
+                main_chiplet.print_stats_file(IF, W, S, name, network)
