@@ -137,25 +137,25 @@ class PE_Basic:
         # Stats
         self.calls  += 1
         
-    def update_ntt_opt(self, mode, stride):
-        if mode == 'psum':
-            reg_file = self.psum_file
-        elif mode == 'wt':
-            reg_file = self.wt_file
-        elif mode == 'if':
-            reg_file = self.if_file
+    # def update_ntt_opt(self, mode, stride):
+    #     if mode == 'psum':
+    #         reg_file = self.psum_file
+    #     elif mode == 'wt':
+    #         reg_file = self.wt_file
+    #     elif mode == 'if':
+    #         reg_file = self.if_file
                  
-        # Each stride is going to have a MAC
-        self.adds.stats_accesses += stride * self.adds.num
-        self.muls.stats_accesses += stride * self.muls.num        
-        # Read 1 values from the file do computations and finally write into that location
-        # Along with Black Magic
-        # self.twicoef.stats_accesses += stride * reg_file.size
-        reg_file.stats_accesses += 2 * reg_file.size  # This will not have stride as we do 1 read and write
+    #     # Each stride is going to have a MAC
+    #     self.adds.stats_accesses += stride * self.adds.num
+    #     self.muls.stats_accesses += stride * self.muls.num        
+    #     # Read 1 values from the file do computations and finally write into that location
+    #     # Along with Black Magic
+    #     # self.twicoef.stats_accesses += stride * reg_file.size
+    #     reg_file.stats_accesses += 2 * reg_file.size  # This will not have stride as we do 1 read and write
         
-        # Stats
-        self.calls  += 1
-        self.shift  += 1
+    #     # Stats
+    #     self.calls  += 1
+    #     self.shift  += 1
 
     # Updates for rotates
     # Number of permts == Number of accesses to transpose unit + internal permts (for F1 Arch) and benes network (for Hyena Arch)

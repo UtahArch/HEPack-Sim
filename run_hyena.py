@@ -43,9 +43,9 @@ with open("{}.m".format(network)) as fin:
             if console_print:
                 S = [1,1]
                 # line = "Dimensions { K: 24, C: 96, R: 1, S: 1, Y:56, X:56 }"
-                line = 'Dimensions { K: 1, C: 96, R: 3, S: 3, Y:56, X:56 }'
+                # line = 'Dimensions { K: 1, C: 96, R: 3, S: 3, Y:56, X:56 }'
                 # line = 'Dimensions { K: 256, C: 64, R: 1, S: 1, Y: 56, X: 56 }'
-                # line = "Dimensions { K: 1, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
+                line = "Dimensions { K: 1, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
                 # line = "Dimensions { K: 64, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
 
             if console_print:
@@ -204,7 +204,7 @@ with open("{}.m".format(network)) as fin:
                         for c_step in range(0, W[2], C_t):
                             main_chiplet.run_hyena_permute_if()
 
-            main_chiplet.calc_time_hyena()
+            # main_chiplet.calc_time_hyena()
 
             if console_print:
                 main_chiplet.print_stats_console(IF, W, S)

@@ -11,7 +11,7 @@ import packings
 import sys
 import os
 
-console_print = False
+console_print = True
 
 if console_print:
     os.system('clear')
@@ -38,8 +38,9 @@ with open("{}.m".format(network)) as fin:
             param = {}
             if console_print:
                 # line = "Dimensions { K: 24, C: 96, R: 1, S: 1, Y:56, X:56 }"
-                line = 'Dimensions { K: 1, C: 96, R: 3, S: 3, Y:56, X:56 }'
+                # line = 'Dimensions { K: 1, C: 96, R: 3, S: 3, Y:56, X:56 }'
                 # line = "Dimensions { K: 512, C: 512, R: 3, S: 3, Y: 7, X: 7 }"
+                line = "Dimensions { K: 1, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
                 # line = "Dimensions { K: 64, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
 
             # if line in done_params:
