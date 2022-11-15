@@ -1,0 +1,6 @@
+data/
+data_*
+micro22.tar.gz
+temp*
+*.pyc
+*code-workspace
