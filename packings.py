@@ -97,25 +97,28 @@ class Chiplet(elements.PE_Basic):
     # Cheetah
 
     ## Calc Stages for cheetah
-    def setup_cheetah(self):
+    def setup_cheetah_f1_f1(self):
         # Pipeline:
         # MUL - IF*WT
-        # NT1   | 
+        # NI1   | 
         # TR1   - F1 NTT
-        # NT2   | 
-        # ROT - Permute PSUM in coeff domain
-        # NI1   |
+        # NI2   | 
+        # SH1     -     
+        # TP1     | Permute PSUM  
+        # SH2     | in coeff domain
+        # TP2     -
+        # NT1   |
         # TR2   - F1 I-NTT
-        # NI2   |
+        # NT2   |
         # KSH - PSUM += Partial PSUM*KSH
         self.stages = [
             ("MUL",self.pe_array.op_mul_if_wt_cycles()),
             ("NT1",self.pe_array.op_ntt_f1_cycles("psum")),
-            ("TR1",self.pe_array.op_psum_rotate_cycles()),
+            ("TR1",self.pe_array.op_psum_transpose_cycles()),
             ("NT2",self.pe_array.op_ntt_f1_cycles("psum")),
             ("ROT",self.pe_array.op_psum_rotate_cycles()),
             ("NI1",self.pe_array.op_ntt_f1_cycles("psum")),
-            ("TR2",self.pe_array.op_psum_rotate_cycles()),
+            ("TR2",self.pe_array.op_psum_transpose_cycles()),
             ("NI2",self.pe_array.op_ntt_f1_cycles("psum")),
             ("KSH",self.pe_array.op_ksh_psum_cycles())
         ]
@@ -244,7 +247,7 @@ class Chiplet(elements.PE_Basic):
         self.seq_cost  = rsct*max([x[1] for x in self.seq])
 
         # Either the MULT Pipeline of the PSUM Collection is going to be the dominant stage
-        defs.cycle_time = max(self.seq_cost, self.stage_cost)
+        defs.cycle_time = max([x[1] for x in self.seq])
         
         # IF Permutation is a separate sequence
         # N1I   |
@@ -266,16 +269,16 @@ class Chiplet(elements.PE_Basic):
         ]
         self.seq2_cost = sum([x[1] for x in self.seq2])
 
-        print self.stages
-        print self.stage_cost, int(math.ceil(float(C)*defs.k_t/defs.c_t)), max([x[1] for x in self.stages])
-        print self.seq
-        print self.seq_cost, rsct, max([x[1] for x in self.seq])
-        print self.seq2
-        print self.seq2_cost
-        print max(self.seq_cost, self.seq2_cost) - self.seq_cost
-        print "\t\t\t\t >> ", self.stage_cost > self.seq_cost, self.stage_cost > self.seq2_cost, self.seq_cost > self.seq2_cost
-        print defs.cycle_time
-        print
+        # print self.stages
+        # print self.stage_cost, int(math.ceil(float(C)*defs.k_t/defs.c_t)), max([x[1] for x in self.stages])
+        # print self.seq
+        # print self.seq_cost, rsct, max([x[1] for x in self.seq])
+        # print self.seq2
+        # print self.seq2_cost
+        # print max(self.seq_cost, self.seq2_cost) - self.seq_cost
+        # print "\t\t\t\t >> ", self.stage_cost > self.seq_cost, self.stage_cost > self.seq2_cost, self.seq_cost > self.seq2_cost
+        # print defs.cycle_time
+        # print
 
     # Run Hyena for all wts and ifs that are packed
     def run_hyena_k(self):
@@ -292,6 +295,23 @@ class Chiplet(elements.PE_Basic):
                 self.memory.stats_accesses += self.pe_array.ksh_file.size
 
             self.pipeline_counts += 1
+            self.cycles += 1
+
+    # Run Hyena for all wts and ifs that are packed
+    def run_hyena_FC(self):
+        
+        self.pe_array.op_wt_rotate()
+        self.pe_array.op_mul_if_wt()
+
+
+        # Access the ksh for the next rotation
+        if defs.num_chiplets == 1:
+            self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size
+        else:
+            self.memory.stats_accesses += self.pe_array.ksh_file.size
+
+        self.pipeline_counts += 1
+        self.cycles += 1
         
 
     # Collate all psums present in it
@@ -302,9 +322,9 @@ class Chiplet(elements.PE_Basic):
         for _ in range(rsct):
             self.pe_array.op_psum_rotate()
             self.pe_array.op_ksh_psum()
+            self.cycles += 1
 
         self.seq_counts += 1
-        self.cycles += 1
 
     # Permute the IF
     def run_hyena_permute_if(self):

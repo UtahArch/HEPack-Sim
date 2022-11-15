@@ -104,12 +104,21 @@ class PE(elements.PE_Basic):
     
     # Rotate Psums after muls and send last B and recieve new 1st B
     # This stage is what requires op_mul_psum_ksh to happen
-    def op_psum_rotate_cycles(self, iters=1):        
-        return defs.rotation * iters
 
-    def op_psum_rotate(self, iters=1):
-        self.update_psum_rotate(iters)
-        self.rot_stats.update_psum_rotate(iters)
+    # For F1 NTT F1 Arch
+    def op_psum_transpose_cycles(self):        
+        return defs.transpose_f1
+
+    def op_psum_transpose(self):
+        self.update_psum_transpose()
+        self.rot_stats.update_psum_transpose()
+
+    def op_psum_shift_cycles(self):        
+        return defs.shift_f1
+
+    def op_psum_shift(self):
+        self.update_psum_shift()
+        self.rot_stats.update_psum_shift()
 
     
     # Rotate Wts after having used them in muls

@@ -74,28 +74,56 @@ with open("{}.m".format(network)) as fin:
             n  = defs.poly_n          # Polynomial Size
             Mt = min(int(n/RS), M)    # Number of non-overlapping Matrices in 1 poly
 
-            C_t = 1              # Pack C_ts
-            while C_t < W[2]:
-                C_t *= 2
-                if Mt*RS*C_t > n:
-                    C_t /= 2
-                    break
 
-            # Wt Packing
+            ## 
+            C_t = 1
             K_t = 1
+            C_t_new = 1
+            # Wt Packing
             while ((K_t < defs.psum_file_num) and (K_t < W[3])):
                 K_t *= 2
-                if RS*C_t*K_t > n:
+                if RS*K_t > n:
                     K_t /= 2
                     break
 
-            # Potential More packing
-            C_t_new = 1
-            while C_t*C_t_new < W[2]:
-                C_t_new *= 2
-                if RS*C_t*C_t_new*K_t > n or Mt/C_t_new == 0:
-                    C_t_new /= 2
+            # Pack C_ts
+            while C_t < W[2]:
+                C_t *= 2
+                if Mt*RS*C_t*K_t > n:
+                    C_t /= 2
                     break
+
+            # # Potential More packing
+            # C_t_new = 1
+            # while C_t*C_t_new < W[2]:
+            #     C_t_new *= 2
+            #     if RS*C_t*C_t_new*K_t > n or Mt/C_t_new == 0 or C_t*C_t_new > math.sqrt(W[2]):
+            #         C_t_new /= 2
+            #         break
+
+            ##
+            # C_t = 1              # Pack C_ts
+            # while C_t < W[2]:
+            #     C_t *= 2
+            #     if Mt*RS*C_t > n:
+            #         C_t /= 2
+            #         break
+
+            # # Wt Packing
+            # K_t = 1
+            # while ((K_t < defs.psum_file_num) and (K_t < W[3])):
+            #     K_t *= 2
+            #     if RS*C_t*K_t > n:
+            #         K_t /= 2
+            #         break
+
+            # # Potential More packing
+            # C_t_new = 1
+            # while C_t*C_t_new < W[2]:
+            #     C_t_new *= 2
+            #     if RS*C_t*C_t_new*K_t > n or Mt/C_t_new == 0:
+            #         C_t_new /= 2
+            #         break
             
             Mt = int(math.ceil(Mt/float(C_t_new)))
             C_t *= C_t_new
@@ -107,7 +135,7 @@ with open("{}.m".format(network)) as fin:
             # Define Classes
             defs.c_t = C_t
             defs.k_t = K_t
-            defs.packing = "hyena"
+            defs.packing = "hyenaV2"
             defs.ntt_type = ntttype
             defs.arch = arch
             defs.num_muls = num_muls
@@ -129,8 +157,8 @@ with open("{}.m".format(network)) as fin:
             main_chiplet = packings.Chiplet()
             main_chiplet.setup_hyena(RS*C_t, W[2], W[3])
 
-            # if console_print:
-            #     continue
+            if console_print:
+                continue
 
             # Bring Values to KSH and twiddle
             # For optimised NTT Twiddle carries the hints
@@ -183,7 +211,10 @@ with open("{}.m".format(network)) as fin:
                             main_chiplet.pe_array.pip_stats.if_file.stats_accesses += main_chiplet.pe_array.if_file.size
 
                             # break
-                            main_chiplet.run_hyena_k()
+                            if Mt == 1:
+                                main_chiplet.run_hyena_FC()
+                            else:
+                                main_chiplet.run_hyena_k()
                             # break
                             iters += 1
                         

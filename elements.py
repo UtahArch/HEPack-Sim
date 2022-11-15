@@ -160,9 +160,19 @@ class PE_Basic:
     # Updates for rotates
     # Number of permts == Number of accesses to transpose unit + internal permts (for F1 Arch) and benes network (for Hyena Arch)
 
-    def update_psum_rotate(self, iters):
-        self.psum_file.stats_accesses += 2 * iters
-        self.permt += iters
+    # def update_psum_rotate(self, iters):
+    #     self.psum_file.stats_accesses += 2 * iters
+    #     self.permt += iters
+    
+    def update_psum_transpose(self):
+        self.psum_file.stats_accesses += 2
+        self.trans += 1
+    
+    def update_psum_shift(self):
+        self.psum_file.stats_accesses += 2
+        self.cross += 1
+
+
 
     # def update_psum_wt_rotate(self):
     #     self.psum_file.stats_accesses += 2

@@ -23,9 +23,9 @@ num_chiplets  = None
 # Arch Choices
 pe_size        = 1024
 # TODO: Confirm and Parameterise
-rotation_f1    = 64     # Rotation for n = 1024 
-rotation_hyena = 1      # Benes network FTW!
-rotation       = None
+transpose_f1    = 32     # Rotation for n = 1024
+shift_f1        = 1
+permute_hyena   = 1      # Benes network FTW!
 
 # Processor
 cycle_time = None     # In Ticks
