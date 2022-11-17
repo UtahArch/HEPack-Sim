@@ -48,6 +48,7 @@ with open("{}.m".format(network)) as fin:
                 # line = "Dimensions { K: 1, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
                 # line = "Dimensions { K: 64, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
                 # line = "Dimensions { K: 1000, C: 2048, R: 7, S: 7, Y: 7, X: 7 }"
+                line = "Dimensions { K: 1, C: 96, R: 3, S: 3, Y:112, X:112 }"
 
             if console_print:
                 if line in done_params:
@@ -136,8 +137,8 @@ with open("{}.m".format(network)) as fin:
                 print "run_hyena: Unkown Paramer for Run 1", defs.ntt_type, defs.arch
                 exit()
 
-            if console_print:
-                continue
+            # if console_print:
+            #     continue
 
             # Bring Values to KSH and twiddle
             # For optimised NTT Twiddle carries the hints
