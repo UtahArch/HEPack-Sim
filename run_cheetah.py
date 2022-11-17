@@ -11,7 +11,7 @@ import packings
 import sys
 import os
 
-console_print = True
+console_print = False
 
 if console_print:
     os.system('clear')
@@ -37,14 +37,18 @@ with open("{}.m".format(network)) as fin:
         elif "Dimensions" in line:
             param = {}
             if console_print:
-                line = "Dimensions { K: 128, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
+                S = [1,1]
+                # line = "Dimensions { K: 24, C: 96, R: 1, S: 1, Y:56, X:56 }"
+                # line = 'Dimensions { K: 1, C: 96, R: 3, S: 3, Y:56, X:56 }'
+                # line = 'Dimensions { K: 256, C: 64, R: 1, S: 1, Y: 56, X: 56 }'
                 # line = "Dimensions { K: 1, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
                 # line = "Dimensions { K: 64, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
-            
-            # if line in done_params:
-            #     continue
-            # else:
-            #     done_params.add(line)
+
+            if console_print:
+                if line in done_params:
+                    continue
+                else:
+                    done_params.add(line)
             
             temp = line.split("{")[1].split("}")[0].split(",")
             for t in temp:
@@ -62,20 +66,27 @@ with open("{}.m".format(network)) as fin:
             XY = IF[0] * IF[1]
 
             defs.poly_n = poly_n
+            n_ckks = defs.poly_n / 2
 
-            if XY < defs.poly_n:
+            if XY < n_ckks:
                 XY_t = XY
-                while C_t < IF[2]:
-                    C_t *= 2
-                    if XY*C_t > defs.poly_n:
-                        C_t /= 2
-                        break
+                if IF[2] > 1:
+                    while C_t < IF[2]:
+                        C_t *= 2
+                        if XY_t*C_t > n_ckks:
+                            break
+                    C_t /= 2
             else:
-                XY_t = defs.poly_n
+                XY_t = n_ckks
+            if C_t > W[2]:
+                print "ERROR Cheetah 1"
+                exit()
 
-            i=0
+            inner_loop=0
             if console_print:
-                print("\nFor Iter {:3d}:  XY_t:{:4d}  C_t:{:4d}  XY*C_t:{:4d}".format(i, XY_t, C_t, XY*C_t))
+                print("XY_t:{:4d}\tC_t:{:4d}\tRS*C_t:{:4d}\t\tPF:{:}\n".format(XY_t, C_t, W[1]*W[0]*C_t, (XY_t*C_t)/float(n_ckks)))
+                # print("\nFor Iter {:3d}:  XY_t:{:4d}  C_t:{:4d}  XY*C_t:{:4d}  RSCt:{:4d}".format(inner_loop, XY_t, C_t, XY*C_t, W[1] * W[0] * C_t))
+            assert(XY_t*C_t <= n_ckks)
 
             # Define Classes and globals
             defs.c_t = C_t
@@ -90,9 +101,14 @@ with open("{}.m".format(network)) as fin:
             
             if defs.ntt_type == 'f1' and defs.arch == 'f1':
                 main_chiplet.setup_cheetah_f1_f1()
+            elif defs.ntt_type == 'f1' and defs.arch == 'hyena':
+                main_chiplet.setup_cheetah_f1_hyena()
             else:
-                print "run_cheetah: Unkown Paramer for Setup 1"
+                print "run_cheetah: Unkown Paramer for Setup 1", defs.ntt_type, defs.arch
                 exit()
+            
+            if console_print:
+                continue
 
             # Bring Values to KSH and twiddle
             # For optimised NTT Twiddle carries the hints
@@ -119,7 +135,7 @@ with open("{}.m".format(network)) as fin:
                     for c_step in range(0, W[2], C_t):
                         # print("Running Iters {} : {} {} {}".format(i, if_step, k_step, c_step))
                         main_chiplet.pe_array.if_file.stats_accesses += main_chiplet.pe_array.if_file.size
-                        main_chiplet.pe_array.pip_stats.if_file.stats_accesses += main_chiplet.pe_array.if_file.size
+                        # main_chiplet.pe_array.pip_stats.if_file.stats_accesses += main_chiplet.pe_array.if_file.size
                         if iters_if < defs.max_c_on_chiplt:
                             main_chiplet.if_l2_cache.stats_accesses += main_chiplet.pe_array.if_file.size
                         else:
@@ -127,14 +143,22 @@ with open("{}.m".format(network)) as fin:
 
                         # break
                         # print if_step, k, c_step
-                        main_chiplet.run_cheetah(W[1] * W[0] * C_t)
+                        inner_loop += W[1] * W[0] * C_t
 
                         # Flush PSUM to memory
                         main_chiplet.pe_array.psum_file.stats_accesses += main_chiplet.pe_array.psum_file.size
-                        main_chiplet.pe_array.pip_stats.psum_file.stats_accesses += main_chiplet.pe_array.psum_file.size
+                        # main_chiplet.pe_array.pip_stats.psum_file.stats_accesses += main_chiplet.pe_array.psum_file.size
                         main_chiplet.memory.stats_accesses += main_chiplet.pe_array.psum_file.size
                     # break
                 # break
+
+            if defs.ntt_type == 'f1' and defs.arch == 'f1':
+                main_chiplet.run_cheetah_f1_f1(inner_loop)
+            elif defs.ntt_type == 'f1' and defs.arch == 'hyena':
+                main_chiplet.run_cheetah_f1_hyena(inner_loop)
+            else:
+                print "run_cheetah: Unkown Paramer for Run 1", defs.ntt_type, defs.arch
+                exit()
 
             if console_print:
                 main_chiplet.print_stats_console(IF, W, S)

@@ -45,7 +45,7 @@ wt_file_size    = poly_n     # Num of 8 b registers / cache blocks
 wt_file_read    = 0
 wt_file_write   = 0
 
-ksh_file_size   = wt_file_size
+ksh_file_size   = if_file_size
 ksh_file_read   = 0
 ksh_file_write  = 0
 

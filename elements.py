@@ -57,12 +57,12 @@ class PE_Basic:
         
         self.twiddle = Cache("Twiddle ", defs.twiddle_size, defs.twiddle_read, defs.twiddle_write)
         
-        self.ksh_file = Cache("KSH File", defs.wt_file_size, defs.ksh_file_read, defs.ksh_file_write)
+        self.ksh_file = Cache("KSH File", defs.ksh_file_size, defs.ksh_file_read, defs.ksh_file_write)
         # The PSUM File is actually a collection of psum_file_num files but we represent it as 1 file and do the nessacery scaling later
         self.psum_file = Cache("PSUM File", defs.if_file_size, defs.psum_file_read, defs.psum_file_write)
 
         # Buffer File used for different units
-        self.buff_file = Cache("PSUM File", defs.if_file_size, defs.buff_file_read, defs.buff_file_write)
+        self.buff_file = Cache("Buffer File", defs.if_file_size, defs.buff_file_read, defs.buff_file_write)
 
         self.adds = ALUUnit("ADD", defs.mac_num, defs.add_exec_time)
         self.muls = ALUUnit("MUL", defs.mac_num, defs.mul_exec_time)
@@ -150,6 +150,17 @@ class PE_Basic:
 
         self.buff_file.stats_accesses += 2 * reg_file_size * iters
         self.trans += iters
+    
+    def update_permute(self, mode, iters):
+        if mode == 'psum':
+            reg_file_size = self.psum_file.size
+        elif mode == 'wt':
+            reg_file_size = self.wt_file.size
+        elif mode == 'if':
+            reg_file_size = self.if_file.size
+
+        self.buff_file.stats_accesses += 2 * reg_file_size * iters
+        self.benes += iters
 
     def update_shift(self, mode, iters):
         if mode == 'psum':

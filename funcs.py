@@ -110,10 +110,15 @@ class PE(elements.PE_Basic):
         self.update_shift(mode, iters)
         self.rot_stats.update_shift(mode, iters)
 
-
-
-    # Rotates for Hyena Arch use the Benes network and defs.rotation caputers that
-
+    ## Hyena Arch
+    # Permutation/Automorphism in F1 Arch is done by
+    # a Benes Network
+    def op_permute_cycles(self, mode):
+        return defs.permute_hyena
+    
+    def op_permute(self, mode, iters):
+        self.update_permute(mode, iters)
+        self.rot_stats.update_permute(mode, iters)
 
 
     ### NTT Operations in a PE
