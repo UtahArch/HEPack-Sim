@@ -12,7 +12,7 @@ import sys
 import os
 import math
 
-console_print = False
+console_print = True
 
 if console_print:
     os.system('clear')
@@ -37,8 +37,8 @@ with open("{}.m".format(network)) as fin:
             S[1] = int(temp[1].split(":")[-1].strip())
         elif "Dimensions" in line:
             param = {}
-            if console_print:
-                S = [1,1]
+            # if console_print:
+            #     S = [1,1]
                 # line = "Dimensions { K: 24, C: 96, R: 1, S: 1, Y:56, X:56 }"
                 # line = 'Dimensions { K: 1, C: 96, R: 3, S: 3, Y:56, X:56 }'
                 # line = 'Dimensions { K: 256, C: 64, R: 1, S: 1, Y: 56, X: 56 }'
@@ -47,10 +47,11 @@ with open("{}.m".format(network)) as fin:
                 # line = "Dimensions { K: 1000, C: 2048, R: 7, S: 7, Y: 7, X: 7 }"
                 # line = "Dimensions { K: 1, C: 96, R: 3, S: 3, Y:112, X:112 }"
             
-            if line in done_params:
-                continue
-            else:
-                done_params.add(line)
+            if console_print:
+                if line in done_params:
+                    continue
+                else:
+                    done_params.add(line)
             
             temp = line.split("{")[1].split("}")[0].split(",")
             for t in temp:
@@ -75,7 +76,11 @@ with open("{}.m".format(network)) as fin:
             Keff = int(math.ceil(W[3] / float(Kt)))
 
             # RS*if_c_cache caching of IFs
-            if_c_cache = min(W[0]*W[1]*W[2], defs.max_if_on_chiplt)
+            if W[0]*W[1]*W[2] <= defs.max_if_on_chiplt:
+                if_c_cache = W[2]
+            else:
+                if_c_cache = defs.max_if_on_chiplt/(W[0]*W[1])
+            assert(if_c_cache <= W[2])
 
             # max_if_on_chiplt caching of PSUMs
             psum_k_cache = min(Keff, defs.max_if_on_chiplt/2)
@@ -84,11 +89,12 @@ with open("{}.m".format(network)) as fin:
             # Define Classes and globals
             defs.packing = "ngraphplus"
             defs.batch_size = batch
+            defs.Kt = Kt
 
             main_chiplet = packings.Chiplet()
             main_chiplet.setup_ngraph()
             if console_print:
-                print "Values: ", P, if_c_cache, psum_k_cache, "\t", Keff
+                print "Values: ", P, if_c_cache, psum_k_cache, "\t", Keff, Kt
                 print
             
             if console_print:

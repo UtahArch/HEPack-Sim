@@ -20,6 +20,11 @@
 
 for network in mobile resnet gnmt
 do
+    rm -rf data_${network}/ngraph*/*
+done
+
+for network in mobile resnet gnmt
+do
     for batch in 1 64 512
     do
         python run_ngraphplus.py ${network} ${batch} 1 &
