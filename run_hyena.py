@@ -44,7 +44,7 @@ with open("{}.m".format(network)) as fin:
                 S = [1,1]
                 # line = "Dimensions { K: 24, C: 96, R: 1, S: 1, Y:56, X:56 }"
                 # line = 'Dimensions { K: 1, C: 96, R: 3, S: 3, Y:56, X:56 }'
-                # line = 'Dimensions { K: 256, C: 64, R: 1, S: 1, Y: 56, X: 56 }'
+                line = 'Dimensions { K: 256, C: 64, R: 1, S: 1, Y: 56, X: 56 }'
                 # line = "Dimensions { K: 1, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
                 # line = "Dimensions { K: 64, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
                 # line = "Dimensions { K: 1000, C: 2048, R: 7, S: 7, Y: 7, X: 7 }"
@@ -76,64 +76,48 @@ with open("{}.m".format(network)) as fin:
             n_ckks = defs.poly_n / 2  # Polynomial Size
             Mt = min(int(n_ckks/RS), M)    # Number of non-overlapping Matrices in 1 poly
 
-            C_t = 1              # Pack C_ts
-            if W[2] > 1:
-                while C_t < W[2]:
-                    C_t *= 2
-                    if Mt*RS*C_t > n_ckks:
-                        break
-                C_t /= 2
-            if C_t > W[2]:
-                print "ERROR Hyena 1"
-                exit()
-
             # Wt Packing
-            K_t = 1
+            Kt = 1
+            Ct = 1
+            Ct_new = 1
             if W[3] > 1:
-                while ((K_t < defs.psum_file_num) and (K_t < W[3])):
-                    K_t *= 2
-                    if RS*C_t*K_t > n_ckks:
+                while ((Kt < defs.psum_file_num) and (Kt < W[3])):
+                    Kt *= 2
+                    if RS*Ct*Kt > n_ckks:
                         break
-                K_t /= 2
-            if K_t > W[3]:
+                Kt /= 2
+            if Kt > W[3]:
                 print "ERROR Hyena 2"
                 exit()
 
-            # Potential More packing
-            C_t_new = 1
+            # Pack Cts
             if W[2] > 1:
-                while C_t*C_t_new < W[2]:
-                    C_t_new *= 2
-                    if RS*C_t*C_t_new*K_t > n_ckks or Mt/C_t_new == 0:
+                while Ct < W[2]:
+                    Ct *= 2
+                    if Mt*RS*Ct > n_ckks or RS*Ct*Kt > n_ckks:
                         break
-                C_t_new /= 2
-            # TODO: This is an assert
-            if C_t*C_t_new > W[2]:
-                print "ERROR Hyena 3"
+                Ct /= 2
+            if Ct > W[2]:
+                print "ERROR Hyena 1"
                 exit()
+            
+            Mt = int(math.floor(Mt/float(Ct_new)))
+            Ct *= Ct_new
 
-            Mt = int(math.floor(Mt/float(C_t_new)))
-            C_t *= C_t_new
-
-            if_replication = int(math.floor(float(n_ckks)/(Mt*C_t*RS)))
+            if_replication = int(math.floor(float(n_ckks)/(Mt*Ct*RS)))
             
             mult_loop = 0
             psum_loop = 0
             if_loop = 0
-            # if console_print:
-            #     print "IF Packing:  P:{}\tM:{}\tRS:{}\tMt:{}\tC_t:{}\tRF:{}\t:: {}".format(P, M, RS, Mt, C_t, if_replication, Mt*RS*C_t/float(n_ckks))
-            #     print "Wt Packing:  K_t:{}\tC_t_new:{}\t\t\t\t:: {}".format(K_t, C_t_new, RS*C_t*K_t/float(n_ckks))
-            #     # print K_t
             if console_print:
-                print("P  :{:4d}\tM     :{:4d}\tMt    :{:4d}\tC_t:{:4d}\t\tIF-PE:{:}".format(P, M, Mt, C_t/C_t_new, (Mt*RS*C_t)/float(n_ckks)))
-                print("K_t:{:4d}\tC_t   :{:4d}\tRS*K_t:{:4d}\tIR :{:4d}\t\tWT-PE:{:}".format(K_t, C_t, W[1]*W[0]*K_t, if_replication, (K_t*C_t*W[0]*W[1])/float(n_ckks)))
-                # print("\nFor Iter {:3d}:  XY_t:{:4d}  C_t:{:4d}  XY*C_t:{:4d}  RSCt:{:4d}".format(inner_loop, XY_t, C_t, XY*C_t, W[1] * W[0] * C_t))
-            assert(Mt*RS*C_t*if_replication <= n_ckks)
-            assert(K_t*C_t*W[0]*W[1] <= n_ckks)
+                print("P  :{:4d}\tM     :{:4d}\tMt    :{:4d}\tCt:{:4d}\t\tIF-PE:{:}".format(P, M, Mt, Ct/Ct_new, (Mt*RS*Ct)/float(n_ckks)))
+                print("Kt:{:4d}\tCt   :{:4d}\tRS*Kt:{:4d}\tIR :{:4d}\t\tWT-PE:{:}".format(Kt, Ct, W[1]*W[0]*Kt, if_replication, (Kt*Ct*W[0]*W[1])/float(n_ckks)))
+            assert(Mt*RS*Ct*if_replication <= n_ckks)
+            assert(Kt*Ct*W[0]*W[1] <= n_ckks)
 
             # Define Classes
-            defs.c_t = C_t
-            defs.k_t = K_t
+            defs.Ct = Ct
+            defs.Kt = Kt
             defs.packing = "hyena"
             defs.ntt_type = ntttype
             defs.arch = arch
@@ -145,9 +129,9 @@ with open("{}.m".format(network)) as fin:
             main_chiplet = packings.Chiplet()
             main_chiplet = packings.Chiplet()
             if defs.ntt_type == 'f1' and defs.arch == 'f1':
-                main_chiplet.setup_hyena_f1_f1(RS*C_t, W[2], W[3])
+                main_chiplet.setup_hyena_f1_f1(RS*Ct, W[2], W[3])
             elif defs.ntt_type == 'f1' and defs.arch == 'hyena':
-                main_chiplet.setup_hyena_f1_hyena(RS*C_t, W[2], W[3])
+                main_chiplet.setup_hyena_f1_hyena(RS*Ct, W[2], W[3])
             else:
                 print "run_hyena: Unkown Paramer for Run 1", defs.ntt_type, defs.arch
                 exit()
@@ -155,69 +139,79 @@ with open("{}.m".format(network)) as fin:
             # if console_print:
             #     continue
 
-            # Bring Values to KSH and twiddle
-            # For optimised NTT Twiddle carries the hints
-            # TODO: Since Re-Use distance it soo much do we have a KSH and Twiddle L2 cache? How does L2 change for large polynomials
-            # TODO: main_chiplet.pe_array.ksh_file.size / C_t feels wrong
-            # main_chiplet.ksh_l2_cache.stats_accesses += main_chiplet.pe_array.ksh_file.size / C_t
-            # main_chiplet.memory.stats_accesses += main_chiplet.pe_array.ksh_file.size / C_t
-            # main_chiplet.pe_array.twiddle.stats_accesses += main_chiplet.pe_array.twiddle.size
-            # main_chiplet.memory.stats_accesses += main_chiplet.pe_array.twiddle.size
-            
-            # TODO: Confirm this ; also since its iso-area can't we give more cache space to this?
-            # num_k_memory = max(0, W[2]/C_t * W[3]/K_t - defs.max_c_on_chiplt)
-            # if W[2]/C_t > defs.max_c_on_chiplt:
-            #     print "Handle this case for ifs"
-            #     exit()
-            # print W[2]/C_t * W[3]/K_t, defs.max_wt_on_chiplt
+            # Bring Values to N KSH values L2
+            main_chiplet.ksh_l2_cache.stats_accesses += main_chiplet.pe_array.ksh_file.size * defs.poly_n
+            main_chiplet.memory.stats_accesses += main_chiplet.pe_array.ksh_file.size * defs.poly_n
             
             for m_step in range(0, M, Mt):              # Iterate over all non-overlapping matrices
+                
                 # Get the if from memory and put it in the L2 for the first iteration
-                # TODO: Do we even need an IF cache?
-                main_chiplet.memory.stats_accesses += main_chiplet.pe_array.if_file.size
-                main_chiplet.if_l2_cache.stats_accesses += main_chiplet.pe_array.if_file.size
+                main_chiplet.memory.stats_accesses += main_chiplet.pe_array.if_file.size * min(defs.max_if_on_chiplt, int(W[2]/Ct))
+                main_chiplet.if_l2_cache.stats_accesses += main_chiplet.pe_array.if_file.size * min(defs.max_if_on_chiplt, int(W[2]/Ct))
 
                 # Fill the L2 cache with wts, we will also have to account for coeff format accesses for opt_ntt's case
-                # Store C/C_t x K/K_t wts in the L2, the rest will have to be handled from memory
-                main_chiplet.memory.stats_accesses += int(math.ceil(main_chiplet.pe_array.wt_file.size * min(defs.max_wt_on_chiplt, W[2]/C_t * W[3]/K_t)))
-                main_chiplet.wt_l2_cache.stats_accesses += int(math.ceil(main_chiplet.pe_array.wt_file.size * min(defs.max_wt_on_chiplt, W[2]/C_t * W[3]/K_t)))
+                # Store C/Ct x K/Kt wts in the L2, the rest will have to be handled from memory
+                main_chiplet.memory.stats_accesses += int(math.ceil(main_chiplet.pe_array.wt_file.size * min(defs.max_wt_on_chiplt, W[2]/Ct * W[3]/Kt)))
+                main_chiplet.wt_l2_cache.stats_accesses += int(math.ceil(main_chiplet.pe_array.wt_file.size * min(defs.max_wt_on_chiplt, W[2]/Ct * W[3]/Kt)))
 
-                for p in range((W[0]-1)*(W[1]-1)/(S[0]*S[1]) + 1):  # Permute to create all overlappingmatrices
+                for non_over_mat in range((W[0]-1)*(W[1]-1)/(S[0]*S[1]) + 1):  # Permute to create all overlappingmatrices
 
-                    iters = 0
-                    for k_step in range(0, W[3], K_t):        # Iterate over all kernels in K_t steps for wts
-                        for c_step in range(0, W[2], C_t):    # Iterate over all channels in C_t steps for wts
+                    iters_wt_inner = 0
+
+                    for k_step in range(0, W[3], Kt):        # Iterate over all kernels in Kt steps for wts
+                        
+                        iters_if_inner = 0
+                        
+                        for c_step in range(0, W[2], Ct):    # Iterate over all channels in Ct steps for wts
+                        
                             # Access wts from the L2 or memory based on number
-                            if iters < defs.max_wt_on_chiplt:
+                            if iters_wt_inner < defs.max_wt_on_chiplt:
                                 main_chiplet.wt_l2_cache.stats_accesses += main_chiplet.pe_array.wt_file.size
                             else:
                                 main_chiplet.memory.stats_accesses += main_chiplet.pe_array.wt_file.size
                             main_chiplet.pe_array.wt_file.stats_accesses += main_chiplet.pe_array.wt_file.size
-                            main_chiplet.pe_array.pip_stats.wt_file.stats_accesses += main_chiplet.pe_array.wt_file.size
-                            # Access ifs from L2
-                            main_chiplet.if_l2_cache.stats_accesses += main_chiplet.pe_array.if_file.size
+                
+                            # Access IF from the L2 or memory based on number
+                            if iters_if_inner < defs.max_if_on_chiplt:
+                                main_chiplet.if_l2_cache.stats_accesses += main_chiplet.pe_array.if_file.size
+                            else:
+                                main_chiplet.memory.stats_accesses += main_chiplet.pe_array.if_file.size
                             main_chiplet.pe_array.if_file.stats_accesses += main_chiplet.pe_array.if_file.size
-                            main_chiplet.pe_array.pip_stats.if_file.stats_accesses += main_chiplet.pe_array.if_file.size
 
-                            # break
-                            mult_loop += int(math.ceil(float(K_t)/if_replication))
+                            mult_loop += int(math.ceil(float(Kt)/if_replication))
+                            iters_wt_inner += 1
+                            iters_if_inner += 1
+
+                            # Data Movement
+                            # 1 IF & Wt
+                            main_chiplet.data_movmt += main_chiplet.pe_array.if_file.size + main_chiplet.pe_array.wt_file.size
                         
-                        # break
-                        psum_loop += RS*C_t
-                        # break
+                        psum_loop += RS*Ct
+                        
+                        # Data Movement
+                        # RSCt KSH
+                        main_chiplet.data_movmt += main_chiplet.pe_array.ksh_file.size * (RS*Ct)
 
                         # Flush PSUM to memory
                         main_chiplet.pe_array.psum_file.stats_accesses += main_chiplet.pe_array.psum_file.size
-                        main_chiplet.pe_array.pip_stats.psum_file.stats_accesses += main_chiplet.pe_array.psum_file.size
                         main_chiplet.memory.stats_accesses += main_chiplet.pe_array.psum_file.size
-                    # break
 
-                    if p != 0:
-                        # Iterate over all channels in C_t steps for ifs
+                    if non_over_mat != 0:
+                        
+                        iters_if = 0
+                        
+                        # Iterate over all channels in Ct steps for ifs
                         # this will happen once every permutation for every set of channel steps the first time they are called and then stored in the L2 cache
-                        # there will be C/C_t ifs in the L2
-                        for c_step in range(0, W[2], C_t):
+                        # there will be C/Ct ifs in the L2
+                        for c_step in range(0, W[2], Ct):
+                            # Access IF from L2 or Memory
+                            # Store the value in L2
+                            main_chiplet.if_l2_cache.stats_accesses += main_chiplet.pe_array.if_file.size
+
                             if_loop += 1
+                            # Data Movement
+                            # 1 KSH
+                            main_chiplet.data_movmt += main_chiplet.pe_array.ksh_file.size
 
             if defs.ntt_type == 'f1' and defs.arch == 'f1':
                 main_chiplet.run_hyena_mult_pipe_f1_f1(mult_loop)
@@ -231,6 +225,7 @@ with open("{}.m".format(network)) as fin:
                 print "run_hyena: Unkown Paramer for Run 1", defs.ntt_type, defs.arch
                 exit()
 
+            main_chiplet.calc_hyena_pseudo()
             if console_print:
                 main_chiplet.print_stats_console(IF, W, S)
                 break

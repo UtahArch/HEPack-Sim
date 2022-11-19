@@ -20,9 +20,6 @@ class PE(elements.PE_Basic):
         self.mul_stats = elements.MUL_Stats()
         self.ksh_stats = elements.KSH_Stats()
         self.rot_stats = elements.ROT_Stats()
-        self.pip_stats = elements.PIP_Stats()
-
-
 
     ### Functions performed in a PE
 
@@ -39,7 +36,7 @@ class PE(elements.PE_Basic):
         # Calculate Time Taken based on the order in the comments
         CYCLE_COUNT += max(self.if_file.read_time, self.wt_file.read_time)
         CYCLE_COUNT += self.muls.exec_time
-
+    
         return CYCLE_COUNT
 
     def op_mul_if_wt(self, iters):

@@ -76,10 +76,19 @@ with open("{}.m".format(network)) as fin:
             n_ckks = defs.poly_n / 2  # Polynomial Size
             Mt = min(int(n_ckks/RS), M)    # Number of non-overlapping Matrices in 1 poly
 
+            C_t = 1              # Pack C_ts
+            if W[2] > 1:
+                while C_t < W[2]:
+                    C_t *= 2
+                    if Mt*RS*C_t > n_ckks:
+                        break
+                C_t /= 2
+            if C_t > W[2]:
+                print "ERROR Hyena 1"
+                exit()
+
             # Wt Packing
             K_t = 1
-            C_t = 1
-            C_t_new = 1
             if W[3] > 1:
                 while ((K_t < defs.psum_file_num) and (K_t < W[3])):
                     K_t *= 2
@@ -90,17 +99,19 @@ with open("{}.m".format(network)) as fin:
                 print "ERROR Hyena 2"
                 exit()
 
-            # Pack C_ts
+            # Potential More packing
+            C_t_new = 1
             if W[2] > 1:
-                while C_t < W[2]:
-                    C_t *= 2
-                    if Mt*RS*C_t > n_ckks or RS*C_t*K_t > n_ckks:
+                while C_t*C_t_new < W[2]:
+                    C_t_new *= 2
+                    if RS*C_t*C_t_new*K_t > n_ckks or Mt/C_t_new == 0:
                         break
-                C_t /= 2
-            if C_t > W[2]:
-                print "ERROR Hyena 1"
+                C_t_new /= 2
+            # TODO: This is an assert
+            if C_t*C_t_new > W[2]:
+                print "ERROR Hyena 3"
                 exit()
-            
+
             Mt = int(math.floor(Mt/float(C_t_new)))
             C_t *= C_t_new
 
@@ -109,6 +120,10 @@ with open("{}.m".format(network)) as fin:
             mult_loop = 0
             psum_loop = 0
             if_loop = 0
+            # if console_print:
+            #     print "IF Packing:  P:{}\tM:{}\tRS:{}\tMt:{}\tC_t:{}\tRF:{}\t:: {}".format(P, M, RS, Mt, C_t, if_replication, Mt*RS*C_t/float(n_ckks))
+            #     print "Wt Packing:  K_t:{}\tC_t_new:{}\t\t\t\t:: {}".format(K_t, C_t_new, RS*C_t*K_t/float(n_ckks))
+            #     # print K_t
             if console_print:
                 print("P  :{:4d}\tM     :{:4d}\tMt    :{:4d}\tC_t:{:4d}\t\tIF-PE:{:}".format(P, M, Mt, C_t/C_t_new, (Mt*RS*C_t)/float(n_ckks)))
                 print("K_t:{:4d}\tC_t   :{:4d}\tRS*K_t:{:4d}\tIR :{:4d}\t\tWT-PE:{:}".format(K_t, C_t, W[1]*W[0]*K_t, if_replication, (K_t*C_t*W[0]*W[1])/float(n_ckks)))

@@ -239,14 +239,3 @@ class ROT_Stats(PE_Basic):
         print("Total Transpose\t:\t{}".format(self.trans))
         print("Total Benes\t:\t{}".format(self.benes))
         self.print_pe_stats()
-
-class PIP_Stats(PE_Basic):
-    
-    def __init__(self):
-        PE_Basic.__init__(self)
-
-    def print_pip_stats(self):
-        print("Total Shift\t:\t{}".format(self.shift))
-        print("Total Transpose\t:\t{}".format(self.trans))
-        print("Total Benes\t:\t{}".format(self.benes))
-        self.print_pe_stats()

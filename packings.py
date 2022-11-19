@@ -37,12 +37,15 @@ class Chiplet(elements.PE_Basic):
         self.if_seq_cost     = None
         self.pipe_choice = None
 
+        self.perms = 0
+        self.autom = 0
+        self.data_movmt = 0
         
     def print_stats_console(self, IF, W, S):
         print IF[0], IF[1], IF[2]
         print W[0], W[1], W[2], W[3]
         print S[0], S[1]
-        if defs.packing != 'ngraph':
+        if 'ngraph' not in defs.packing:
             for x in self.mult_pipe:
                 print x[0], x[1], "::",
             print
@@ -56,7 +59,7 @@ class Chiplet(elements.PE_Basic):
             print self.mult_pipe_cost, self.psum_pipe_cost, self.if_seq_cost, "\t", self.pipe_choice
             print self.mult_pipe_counts, self.psum_pipe_counts, self.if_seq_counts
 
-        print defs.k_t, defs.c_t, defs.packing, defs.ntt_type, defs.arch, defs.batch_size, defs.poly_n, defs.num_chiplets, defs.cycle_time
+        print defs.Kt, defs.Ct, defs.packing, defs.ntt_type, defs.arch, defs.batch_size, defs.poly_n, defs.num_chiplets, defs.cycle_time
         print("=== Stats ===")
         print("Total Cycles Taken :\t{}".format(self.cycles))
         print("Total MULT Pipe    :\t{}".format(self.mult_pipe_counts))
@@ -64,12 +67,9 @@ class Chiplet(elements.PE_Basic):
         print("Total IF Seq       :\t{}".format(self.if_seq_counts))
         print("Total Stalls       :\t{}".format(self.stalls))
         print("Total Time Taken   :\t{}".format(self.cycles * defs.cycle_time + self.stalls))
-        # print("Total PE Hops      :\t{}".format(self.pe_array.phops))
-        # print("Total Chiplet Hops :\t{}".format(self.pe_array.chops))
-        # print("Total PHOP Time    :\t{}".format(self.pe_array.phops * defs.phop_time))
-        # print("Total CHOP Time    :\t{}".format(self.pe_array.chops * defs.chop_time))
-        # print("Total Shifts       :\t{}".format(self.pe_array.shift))
-        # print("Total Permutations :\t{}".format(self.pe_array.permt))
+        print("Automorphisms      :\t{}".format(self.autom))
+        print("Permutations       :\t{}".format(self.perms))
+        print("Data Movement      :\t{}".format(self.data_movmt))
         print("=== Chiplet Stats ===")
         # self.pe_array.print_pe_stats()
         self.wt_l2_cache.print_stats()
@@ -84,8 +84,13 @@ class Chiplet(elements.PE_Basic):
         self.pe_array.rot_stats.print_rot_stats()
 
     def print_stats_file(self, IF, W, S, name, network):
-        output_path = "data_{}/{}_{}_{}_{}/{}_{}_{}_{}_{}_{}_{}.data".format(network, defs.packing, defs.ntt_type, defs.arch, defs.poly_n, name, IF[0], IF[1], W[0], W[1], W[2], W[3])
-        print output_path
+
+        if 'ngraph' not in defs.packing:
+            output_path = "data_{}/{}_{}_{}_{}/{}_{}_{}_{}_{}_{}_{}.data".format(network, defs.packing, defs.ntt_type, defs.arch, defs.poly_n, name, IF[0], IF[1], W[0], W[1], W[2], W[3])
+            print output_path
+        else:
+            output_path = "data_{}/{}_{}_{}/{}_{}_{}_{}_{}_{}_{}.data".format(network, defs.packing, defs.batch_size, defs.poly_n, name, IF[0], IF[1], W[0], W[1], W[2], W[3])
+            print output_path
 
         stout_save = sys.stdout
         sys.stdout = open(output_path, 'w')
@@ -161,6 +166,9 @@ class Chiplet(elements.PE_Basic):
 
         defs.cycle_time = max([x[1] for x in self.mult_pipe])
     
+    def calc_cheetah_pseudo(self):
+        self.perms = self.mult_pipe_counts
+    
     ## Run Cheetah for all wts along the channel step that are packed
     def run_cheetah_f1_f1(self, runs):
     
@@ -168,8 +176,6 @@ class Chiplet(elements.PE_Basic):
         # An IF is brought for processing and run wts are brouht
         self.memory.stats_accesses  += runs * self.pe_array.wt_file.size
         self.pe_array.wt_file.stats_accesses += runs * self.pe_array.wt_file.size
-        # self.pe_array.pip_stats.wt_file.stats_accesses += runs * self.pe_array.wt_file.size
-        # self.pe_array.if_file.stats_accesses += self.pe_array.if_file.size
 
         self.mult_pipe_counts += runs
         self.cycles += runs
@@ -204,8 +210,6 @@ class Chiplet(elements.PE_Basic):
         # An IF is brought for processing and run wts are brouht
         self.memory.stats_accesses  += runs * self.pe_array.wt_file.size
         self.pe_array.wt_file.stats_accesses += runs * self.pe_array.wt_file.size
-        # self.pe_array.pip_stats.wt_file.stats_accesses += runs * self.pe_array.wt_file.size
-        # self.pe_array.if_file.stats_accesses += self.pe_array.if_file.size
 
         self.mult_pipe_counts += runs
         self.cycles += runs
@@ -276,6 +280,10 @@ class Chiplet(elements.PE_Basic):
         ]
         
         defs.cycle_time = max([x[1] for x in self.mult_pipe])
+    
+    def calc_epic_pseudo(self):
+        self.autom = self.mult_pipe_counts
+        self.perms = self.mult_pipe_counts
     
     ## Run EPIC for all wts and ifs that are packed
     def run_epic_f1_f1(self, runs):
@@ -437,6 +445,10 @@ class Chiplet(elements.PE_Basic):
         ]
 
         defs.cycle_time = max([x[1] for x in self.mult_pipe])
+    
+    def calc_hyena_pseudo(self):
+        self.autom = self.mult_pipe_counts + self.psum_pipe_counts
+        self.perms = self.if_seq_counts
 
     # Run Hyena for all wts and ifs that are packed
     def run_hyena_mult_pipe_f1_f1(self, runs):
@@ -451,18 +463,6 @@ class Chiplet(elements.PE_Basic):
 
         self.pe_array.op_mul_if_wt(runs)
 
-        # Access the ksh for the next rotation
-        if defs.num_chiplets == 1:
-            self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size * runs
-        else:
-            self.memory.stats_accesses += self.pe_array.ksh_file.size * runs
-        
-        # TODO: This and FC Handling!
-        # for k in range(defs.k_t):
-        #     self.pe_array.op_wt_rotate()
-        #     self.pe_array.op_mul_if_wt()
-        #
-
     # Collate all psums present in it
     def run_hyena_psum_pipe_f1_f1(self, runs):
 
@@ -475,11 +475,16 @@ class Chiplet(elements.PE_Basic):
         self.pe_array.op_transpose("psum",runs)
 
         self.pe_array.op_ksh_psum(runs)
+
+        # Access the ksh for the next rotation
+        if defs.num_chiplets == 1:
+            self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size * runs
+        else:
+            self.memory.stats_accesses += self.pe_array.ksh_file.size * runs
     
     # Permute the IF
     def run_hyena_if_seq_f1_f1(self, runs):
         
-        # TODO: Add Stall Calculation
         self.if_seq_counts += runs
 
         self.pe_array.op_ntt_f1("if",runs)
@@ -496,6 +501,12 @@ class Chiplet(elements.PE_Basic):
         self.pe_array.op_ntt_f1("if",runs)
 
         self.pe_array.op_ksh_if(runs)
+
+        # Access the ksh for the next rotation
+        if defs.num_chiplets == 1:
+            self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size * runs
+        else:
+            self.memory.stats_accesses += self.pe_array.ksh_file.size * runs
     
     ## Setup 
     def setup_hyena_f1_hyena(self, rsct, C, K):
@@ -552,12 +563,6 @@ class Chiplet(elements.PE_Basic):
 
         self.pe_array.op_mul_if_wt(runs)
 
-        # Access the ksh for the next rotation
-        if defs.num_chiplets == 1:
-            self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size * runs
-        else:
-            self.memory.stats_accesses += self.pe_array.ksh_file.size * runs
-
     # Collate all psums present in it
     def run_hyena_psum_pipe_f1_hyena(self, runs):
 
@@ -567,11 +572,16 @@ class Chiplet(elements.PE_Basic):
         self.pe_array.op_permute("psum",runs)
 
         self.pe_array.op_ksh_psum(runs)
+
+        # Access the ksh for the next rotation
+        if defs.num_chiplets == 1:
+            self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size * runs
+        else:
+            self.memory.stats_accesses += self.pe_array.ksh_file.size * runs
     
     # Permute the IF
     def run_hyena_if_seq_f1_hyena(self, runs):
         
-        # TODO: Add Stall Calculation
         self.if_seq_counts += runs
 
         self.pe_array.op_ntt_f1("if",runs)
@@ -585,3 +595,221 @@ class Chiplet(elements.PE_Basic):
         self.pe_array.op_ntt_f1("if",runs)
 
         self.pe_array.op_ksh_if(runs)
+
+        # Access the ksh for the next rotation
+        if defs.num_chiplets == 1:
+            self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size * runs
+        else:
+            self.memory.stats_accesses += self.pe_array.ksh_file.size * runs
+
+
+
+    # NGraph-HE Packing
+    
+    ## NGraph is only going to be limited by the number of multiplications it can do
+    def setup_ngraph(self):
+        defs.cycle_time = self.pe_array.op_mul_if_wt_cycles()
+    
+    ## Run for all wts
+    def run_ngraph(self, runs):
+        
+        # Get IFs from L2 and Wts from Mem
+        self.pe_array.if_file.stats_accesses += runs * self.pe_array.if_file.size
+        self.if_l2_cache.stats_accesses += runs * self.pe_array.if_file.size
+        
+        self.pe_array.wt_file.stats_accesses += runs * self.pe_array.wt_file.size
+        self.memory.stats_accesses += runs * self.pe_array.wt_file.size
+
+        self.mult_pipe_counts += runs
+        self.cycles += runs
+        self.pe_array.op_mul_if_wt(runs)
+    
+    # Channel
+
+    # IF Permutation is a separate sequence
+        # NI1   | 
+        # TR1   - F1 NTT
+        # NI2   | 
+        # SH1     -     
+        # TI1     | Permute IF  
+        # SH2     | in coeff domain
+        # TI2     -
+        # NT1   |
+        # TR2   - F1 I-NTT
+        # NT2   |
+        # KSI - KSH*IF
+
+    ## Setup 
+    def setup_channel_f1_f1(self):
+        # Due to the complicated nature of the system, there can be no "pipelining" done
+        defs.cycle_time = 1 
+
+        # Multiply is going to involve just
+        # a IF*WT that is going to get accumulated
+        # which will be a sequence of many MULs
+        self.mult_pipe = [("MUL",self.pe_array.op_mul_if_wt_cycles())]
+        self.mult_pipe_cost = self.pe_array.op_mul_if_wt_cycles()
+
+        # PSUM Rotation is going to involve
+        # KSH * PSUM
+        # SH1     -     
+        # TI1     | Permute PSUM
+        # SH2     | in Eval domain
+        # TI2     -
+        # Which is a one time cost
+        self.psum_pipe = [
+            ("SH1",self.pe_array.op_shift_cycles("psum")),
+            ("TI1",self.pe_array.op_transpose_cycles("psum")),
+            ("SH2",self.pe_array.op_shift_cycles("psum")),
+            ("TI2",self.pe_array.op_transpose_cycles("psum")),
+
+            ("KSH",self.pe_array.op_ksh_psum_cycles())
+        ]
+        self.psum_pipe_cost = sum([x[1] for x in self.psum_pipe])
+
+        # IF Rotation is going to involve
+        # KSH * IF
+        # SH1     -     
+        # TI1     | Permute IF
+        # SH2     | in Eval domain
+        # TI2     -
+        # This can be pipelined
+        self.if_seq = [
+            ("SH1",self.pe_array.op_shift_cycles("if")),
+            ("TI1",self.pe_array.op_transpose_cycles("if")),
+            ("SH2",self.pe_array.op_shift_cycles("if")),
+            ("TI2",self.pe_array.op_transpose_cycles("if")),
+
+            ("KSH",self.pe_array.op_ksh_if_cycles())
+        ]
+        self.if_seq_cost = max([x[1] for x in self.if_seq])
+    
+    def calc_channel_pseudo(self):
+        self.autom = self.mult_pipe_counts + self.psum_pipe_counts + self.if_seq_counts
+
+    # Run Hyena for all wts and ifs that are packed
+    def run_channel_mult_pipe_f1_f1(self, runs):
+
+        self.mult_pipe_counts += runs
+        self.cycles += runs * self.mult_pipe_cost
+
+        self.pe_array.op_mul_if_wt(runs)
+
+        # Access the wts for each RS value next rotation
+        self.pe_array.wt_file.stats_accesses += self.pe_array.wt_file.size * runs
+        self.memory.stats_accesses += self.pe_array.wt_file.size * runs
+
+    # Collate all psums present in it
+    def run_channel_psum_pipe_f1_f1(self, runs):
+
+        self.psum_pipe_counts += runs
+        self.cycles += runs * self.psum_pipe_cost
+
+        self.pe_array.op_shift("psum",runs)
+        self.pe_array.op_transpose("psum",runs)
+        self.pe_array.op_shift("psum",runs)
+        self.pe_array.op_transpose("psum",runs)
+
+        self.pe_array.op_ksh_psum(runs)
+
+        # Access the ksh for the next rotation
+        if defs.num_chiplets == 1:
+            self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size * runs
+        else:
+            self.memory.stats_accesses += self.pe_array.ksh_file.size * runs
+    
+    # Permute the IF
+    def run_channel_if_seq_f1_f1(self, runs):
+        
+        self.if_seq_counts += runs
+        self.cycles += runs * self.if_seq_cost
+        
+        self.pe_array.op_shift("if",runs)
+        self.pe_array.op_transpose("if",runs)
+        self.pe_array.op_shift("if",runs)
+        self.pe_array.op_transpose("if",runs)
+
+        self.pe_array.op_ksh_if(runs)
+
+        # Access the ksh for the next rotation
+        if defs.num_chiplets == 1:
+            self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size * runs
+        else:
+            self.memory.stats_accesses += self.pe_array.ksh_file.size * runs
+
+    ## Setup 
+    def setup_channel_f1_hyena(self):
+        # Due to the complicated nature of the system, there can be no "pipelining" done
+        defs.cycle_time = 1 
+
+        # Multiply is going to involve just
+        # a IF*WT that is going to get accumulated
+        # which will be a sequence of many MULs
+        self.mult_pipe = [("MUL",self.pe_array.op_mul_if_wt_cycles())]
+        self.mult_pipe_cost = self.pe_array.op_mul_if_wt_cycles()
+
+        # PSUM Rotation is going to involve
+        # KSH * PSUM
+        # PRP - Permute PSum in Eval Domain
+        # This is a one time cost
+        self.psum_pipe = [
+            ("PRP",self.pe_array.op_permute_cycles("psum")),
+
+            ("KSH",self.pe_array.op_ksh_psum_cycles())
+        ]
+        self.psum_pipe_cost = sum([x[1] for x in self.psum_pipe])
+
+        # IF Rotation is going to involve
+        # KSH * IF
+        # PRP - Permute IF in Eval Domain
+        # This can be pipelined
+        self.if_seq = [
+            ("PRP",self.pe_array.op_permute_cycles("if")),
+
+            ("KSH",self.pe_array.op_ksh_if_cycles())
+        ]
+        self.if_seq_cost = max([x[1] for x in self.if_seq])
+
+    # Run Hyena for all wts and ifs that are packed
+    def run_channel_mult_pipe_f1_hynea(self, runs):
+
+        self.mult_pipe_counts += runs
+        self.cycles += runs * self.mult_pipe_cost
+
+        self.pe_array.op_mul_if_wt(runs)
+
+        # Access the wts for each RS value next rotation
+        self.pe_array.wt_file.stats_accesses += self.pe_array.wt_file.size * runs
+        self.memory.stats_accesses += self.pe_array.wt_file.size * runs
+
+    # Collate all psums present in it
+    def run_channel_psum_pipe_f1_hynea(self, runs):
+
+        self.psum_pipe_counts += runs
+        self.cycles += runs * self.psum_pipe_cost
+
+        self.pe_array.op_permute('psum', runs)
+
+        self.pe_array.op_ksh_psum(runs)
+
+        # Access the ksh for the next rotation
+        if defs.num_chiplets == 1:
+            self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size * runs
+        else:
+            self.memory.stats_accesses += self.pe_array.ksh_file.size * runs
+    
+    # Permute the IF
+    def run_channel_if_seq_f1_hynea(self, runs):
+        
+        self.if_seq_counts += runs
+        self.cycles += runs * self.if_seq_cost
+        
+        self.pe_array.op_permute('if', runs)
+
+        self.pe_array.op_ksh_if(runs)
+
+        # Access the ksh for the next rotation
+        if defs.num_chiplets == 1:
+            self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size * runs
+        else:
+            self.memory.stats_accesses += self.pe_array.ksh_file.size * runs

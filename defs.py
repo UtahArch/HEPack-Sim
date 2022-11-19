@@ -9,8 +9,8 @@
 # Global Definitions
 
 ## Params
-k_t = None
-c_t = None
+Kt = None
+Ct = None
 
 packing    = "cheetah"
 ntt_type   = "baseline"
@@ -27,13 +27,13 @@ permute_hyena   = 1      # Benes network FTW!
 
 # Processor
 cycle_time = None     # In Ticks
-tick_time  = 5        # In ns
+tick_time  = 1        # In ns
 
 # PE
 
 ## MACs
 mac_num         = poly_n*2
-mul_exec_time   = 5     # In Cycles
+mul_exec_time   = 5     # In Ticks
 add_exec_time   = 0     
 
 ## L1 Caches
@@ -71,7 +71,8 @@ twicoef_write   = 0
 ## L2 Caches
 max_c_on_chiplt   = 512
 max_ksh_on_chiplt = 1024
-max_wt_on_chiplt  = 512
+max_wt_on_chiplt  = max_c_on_chiplt
+max_if_on_chiplt  = max_c_on_chiplt
 
 ### IFs
 if_l2_size  = if_file_size * max_c_on_chiplt
