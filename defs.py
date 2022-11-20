@@ -11,6 +11,7 @@
 ## Params
 Kt = None
 Ct = None
+Bt = 1
 
 packing    = "cheetah"
 ntt_type   = "baseline"

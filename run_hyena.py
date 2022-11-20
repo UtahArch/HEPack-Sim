@@ -44,11 +44,11 @@ with open("{}.m".format(network)) as fin:
                 S = [1,1]
                 # line = "Dimensions { K: 24, C: 96, R: 1, S: 1, Y:56, X:56 }"
                 # line = 'Dimensions { K: 1, C: 96, R: 3, S: 3, Y:56, X:56 }'
-                line = 'Dimensions { K: 256, C: 64, R: 1, S: 1, Y: 56, X: 56 }'
+                # line = 'Dimensions { K: 256, C: 64, R: 1, S: 1, Y: 56, X: 56 }'
                 # line = "Dimensions { K: 1, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
                 # line = "Dimensions { K: 64, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
-                # line = "Dimensions { K: 1000, C: 2048, R: 7, S: 7, Y: 7, X: 7 }"
-                line = "Dimensions { K: 1, C: 96, R: 3, S: 3, Y:112, X:112 }"
+                line = "Dimensions { K: 2048, C: 512, R: 1, S: 1, Y: 7, X: 7 }"
+                # line = "Dimensions { K: 1, C: 96, R: 3, S: 3, Y:112, X:112 }"
 
             if console_print:
                 if line in done_params:

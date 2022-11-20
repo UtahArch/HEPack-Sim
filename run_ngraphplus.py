@@ -12,7 +12,7 @@ import sys
 import os
 import math
 
-console_print = True
+console_print = False
 
 if console_print:
     os.system('clear')

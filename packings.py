@@ -86,6 +86,8 @@ class Chiplet(elements.PE_Basic):
     def print_stats_file(self, IF, W, S, name, network):
 
         if 'ngraph' not in defs.packing:
+            if 'plus' in defs.packing:
+                defs.packing = defs.packing + "_" + str(defs.batch_size)
             output_path = "data_{}/{}_{}_{}_{}/{}_{}_{}_{}_{}_{}_{}.data".format(network, defs.packing, defs.ntt_type, defs.arch, defs.poly_n, name, IF[0], IF[1], W[0], W[1], W[2], W[3])
             print output_path
         else:
