@@ -1,8 +1,8 @@
 for bench in resnet gnmt mobile resnet20
 do
-    for pack in ngraphplus ngraph
+    for pack in ngraphplus ngraph hyenaplus
     do
-        for batch in 1 16 32 64 512
+        for batch in 1 8 16 32 64 512
         do
             mkdir -p "data_${bench}/${pack}_${batch}_1024"
         done

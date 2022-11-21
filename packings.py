@@ -59,7 +59,7 @@ class Chiplet(elements.PE_Basic):
             print self.mult_pipe_cost, self.psum_pipe_cost, self.if_seq_cost, "\t", self.pipe_choice
             print self.mult_pipe_counts, self.psum_pipe_counts, self.if_seq_counts
 
-        print defs.Kt, defs.Ct, defs.packing, defs.ntt_type, defs.arch, defs.batch_size, defs.poly_n, defs.num_chiplets, defs.cycle_time
+        print defs.Kt, defs.Ct, defs.Bt, defs.packing, defs.ntt_type, defs.arch, defs.batch_size, defs.poly_n, defs.num_chiplets, defs.cycle_time
         print("=== Stats ===")
         print("Total Cycles Taken :\t{}".format(self.cycles))
         print("Total MULT Pipe    :\t{}".format(self.mult_pipe_counts))
@@ -85,9 +85,7 @@ class Chiplet(elements.PE_Basic):
 
     def print_stats_file(self, IF, W, S, name, network):
 
-        if 'ngraph' not in defs.packing:
-            if 'plus' in defs.packing:
-                defs.packing = defs.packing + "_" + str(defs.batch_size)
+        if 'ngraph' not in defs.packing and 'plus' not in defs.packing:
             output_path = "data_{}/{}_{}_{}_{}/{}_{}_{}_{}_{}_{}_{}.data".format(network, defs.packing, defs.ntt_type, defs.arch, defs.poly_n, name, IF[0], IF[1], W[0], W[1], W[2], W[3])
             print output_path
         else:

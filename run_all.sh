@@ -18,19 +18,20 @@
 # done
 # wait
 
-# for network in mobile resnet gnmt
-# do
-#     rm -rf data_${network}/ngraph*/*
-#     rm -rf data_${network}/hyenaplus*/*
-# done
+for network in mobile resnet gnmt
+do
+    rm -rf data_${network}/ngraph*/*
+    rm -rf data_${network}/hyenaplus*/*
+done
 
-# for network in mobile resnet gnmt
-# do
-#     for batch in 1 16 32 64 512
-#     do
-#         python run_ngraphplus.py ${network} ${batch} 1 &
-#         python run_ngraph.py     ${network} ${batch} 1 &
-#     done
-#     wait
-# done
-# wait
+for network in resnet
+do
+    for batch in 1 8 64 512
+    do
+        python run_ngraphplus.py ${network} ${batch} 1 &
+        python run_ngraph.py     ${network} ${batch} 1 &
+        python run_hyenaplus.py  ${network} f1 hyena 1 ${batch} &
+    done
+    wait
+done
+wait
