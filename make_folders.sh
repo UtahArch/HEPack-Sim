@@ -1,4 +1,4 @@
-for bench in resnet gnmt mobile
+for bench in resnet gnmt mobile resnet20
 do
     for pack in ngraphplus ngraph
     do
@@ -21,7 +21,7 @@ done
 #     done
 # done
 
-for bench in resnet gnmt mobile
+for bench in resnet gnmt mobile resnet20
 do
     for pack in cheetah epic hyena channel
     do

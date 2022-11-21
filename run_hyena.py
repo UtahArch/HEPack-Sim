@@ -40,14 +40,14 @@ with open("{}.m".format(network)) as fin:
             # print S, line
         elif "Dimensions" in line:
             param = {}
-            if console_print:
-                S = [1,1]
+            # if console_print:
+            #     S = [1,1]
                 # line = "Dimensions { K: 24, C: 96, R: 1, S: 1, Y:56, X:56 }"
                 # line = 'Dimensions { K: 1, C: 96, R: 3, S: 3, Y:56, X:56 }'
                 # line = 'Dimensions { K: 256, C: 64, R: 1, S: 1, Y: 56, X: 56 }'
                 # line = "Dimensions { K: 1, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
                 # line = "Dimensions { K: 64, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
-                line = "Dimensions { K: 2048, C: 512, R: 1, S: 1, Y: 7, X: 7 }"
+                # line = "Dimensions { K: 2048, C: 512, R: 1, S: 1, Y: 7, X: 7 }"
                 # line = "Dimensions { K: 1, C: 96, R: 3, S: 3, Y:112, X:112 }"
 
             if console_print:
@@ -79,30 +79,20 @@ with open("{}.m".format(network)) as fin:
             # Wt Packing
             Kt = 1
             Ct = 1
-            Ct_new = 1
-            if W[3] > 1:
-                while ((Kt < defs.psum_file_num) and (Kt < W[3])):
-                    Kt *= 2
-                    if RS*Ct*Kt > n_ckks:
-                        break
-                Kt /= 2
-            if Kt > W[3]:
-                print "ERROR Hyena 2"
-                exit()
+            while ((Kt <= defs.psum_file_num) and (Kt <= W[3])):
+                Kt *= 2
+                if RS*Ct*Kt > n_ckks:
+                    break
+            Kt /= 2
+            assert(Kt <= W[3])
 
             # Pack Cts
-            if W[2] > 1:
-                while Ct < W[2]:
-                    Ct *= 2
-                    if Mt*RS*Ct > n_ckks or RS*Ct*Kt > n_ckks:
-                        break
-                Ct /= 2
-            if Ct > W[2]:
-                print "ERROR Hyena 1"
-                exit()
-            
-            Mt = int(math.floor(Mt/float(Ct_new)))
-            Ct *= Ct_new
+            while Ct <= W[2]:
+                Ct *= 2
+                if Mt*RS*Ct > n_ckks or RS*Ct*Kt > n_ckks:
+                    break
+            Ct /= 2
+            assert(Ct <= W[2])
 
             if_replication = int(math.floor(float(n_ckks)/(Mt*Ct*RS)))
             
@@ -110,10 +100,11 @@ with open("{}.m".format(network)) as fin:
             psum_loop = 0
             if_loop = 0
             if console_print:
-                print("P  :{:4d}\tM     :{:4d}\tMt    :{:4d}\tCt:{:4d}\t\tIF-PE:{:}".format(P, M, Mt, Ct/Ct_new, (Mt*RS*Ct)/float(n_ckks)))
-                print("Kt:{:4d}\tCt   :{:4d}\tRS*Kt:{:4d}\tIR :{:4d}\t\tWT-PE:{:}".format(Kt, Ct, W[1]*W[0]*Kt, if_replication, (Kt*Ct*W[0]*W[1])/float(n_ckks)))
+                print("P  :{:4d}\tM     :{:4d}\tMt    :{:4d}\tCt:{:4d}\t\tIF-PE:{:}".format(P, M, Mt, Ct, (Mt*RS*Ct)/float(n_ckks)))
+                print("Kt:{:4d}\tIFR   :{:4d}\tRS*Kt:{:4d}\tIR :{:4d}\t\tWT-PE:{:}".format(Kt, if_replication, W[1]*W[0]*Kt, if_replication, (Kt*Ct*W[0]*W[1])/float(n_ckks)))
             assert(Mt*RS*Ct*if_replication <= n_ckks)
             assert(Kt*Ct*W[0]*W[1] <= n_ckks)
+            assert(Kt*Ct*Mt*if_replication != 0)
 
             # Define Classes
             defs.Ct = Ct
@@ -136,8 +127,8 @@ with open("{}.m".format(network)) as fin:
                 print "run_hyena: Unkown Paramer for Run 1", defs.ntt_type, defs.arch
                 exit()
 
-            # if console_print:
-            #     continue
+            if console_print:
+                continue
 
             # Bring Values to N KSH values L2
             main_chiplet.ksh_l2_cache.stats_accesses += main_chiplet.pe_array.ksh_file.size * defs.poly_n
@@ -211,7 +202,7 @@ with open("{}.m".format(network)) as fin:
                             if_loop += 1
                             # Data Movement
                             # 1 KSH
-                            main_chiplet.data_movmt += main_chiplet.pe_array.ksh_file.size
+                            main_chiplet.data_movmt += main_chiplet.pe_array.ksh_file.size 
 
             if defs.ntt_type == 'f1' and defs.arch == 'f1':
                 main_chiplet.run_hyena_mult_pipe_f1_f1(mult_loop)

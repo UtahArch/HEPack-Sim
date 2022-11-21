@@ -36,15 +36,15 @@ with open("{}.m".format(network)) as fin:
             S[1] = int(temp[1].split(":")[-1].strip())
         elif "Dimensions" in line:
             param = {}
-            if console_print:
-                S = [1,1]
-                # line = "Dimensions { K: 24, C: 96, R: 1, S: 1, Y:56, X:56 }"
-                # line = 'Dimensions { K: 1, C: 96, R: 3, S: 3, Y:56, X:56 }'
-                # line = 'Dimensions { K: 256, C: 64, R: 1, S: 1, Y: 56, X: 56 }'
-                # line = "Dimensions { K: 1, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
-                # line = "Dimensions { K: 64, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
-                # line = "Dimensions { K: 1000, C: 2048, R: 7, S: 7, Y: 7, X: 7 }"
-                # line = "Dimensions { K: 1, C: 96, R: 3, S: 3, Y:112, X:112 }"
+            # if console_print:
+            #     S = [1,1]
+            #     # line = "Dimensions { K: 24, C: 96, R: 1, S: 1, Y:56, X:56 }"
+            #     # line = 'Dimensions { K: 1, C: 96, R: 3, S: 3, Y:56, X:56 }'
+            #     # line = 'Dimensions { K: 256, C: 64, R: 1, S: 1, Y: 56, X: 56 }'
+            #     # line = "Dimensions { K: 1, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
+            #     # line = "Dimensions { K: 64, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
+            #     # line = "Dimensions { K: 1000, C: 2048, R: 7, S: 7, Y: 7, X: 7 }"
+            #     # line = "Dimensions { K: 1, C: 96, R: 3, S: 3, Y:112, X:112 }"
             
             if console_print:
                 if line in done_params:
@@ -71,32 +71,25 @@ with open("{}.m".format(network)) as fin:
 
             if XY < n_ckks:
                 XtYt = XY
-                if IF[2] > 1:
-                    while Ct < IF[2]:
-                        Ct *= 2
-                        if XtYt*Ct > n_ckks:
-                            break
-                    Ct /= 2
+                while Ct <= IF[2]:
+                    Ct *= 2
+                    if XtYt*Ct > n_ckks:
+                        break
+                Ct /= 2
             else:
                 XtYt = n_ckks
-            if Ct > W[2]:
-                print "ERROR EPIC 1"
-                exit()
-
-            assert ( Ct * W[0] * W[1] <= n_ckks)
+            assert(Ct <= W[2])
+            assert(Ct*XtYt <= n_ckks)
             
             # To decide Kt based on Ct - Wt Packing
             Kt = 1
-            if W[3] > 1:
-                while Kt < W[3]:
-                    if Kt * Ct * W[0] * W[1] <= n_ckks:
-                        Kt *= 2
-                    else:
-                        break
-                Kt /= 2
-            if Kt > W[3]:
-                print "ERROR EPIC 2"
-                exit()
+            while Kt <= W[3]:
+                if Kt * Ct * W[0] * W[1] <= n_ckks:
+                    Kt *= 2
+                else:
+                    break
+            Kt /= 2
+            assert(Kt <= W[3])
 
             inner_loop=0
             if console_print:
@@ -104,6 +97,7 @@ with open("{}.m".format(network)) as fin:
                 print("Kt :{:4d}\tRS*Kt:{:4d}\t\tPF:{:}\n".format(Kt, W[1]*W[0]*Kt, (Kt*Ct*W[0]*W[1])/float(n_ckks)))
             assert(XtYt*Ct <= n_ckks)
             assert(Kt*Ct*W[0]*W[1] <= n_ckks)
+            assert(XtYt*Ct*Kt != 0)
 
             # Define Classes
             defs.Ct = Ct
@@ -124,8 +118,8 @@ with open("{}.m".format(network)) as fin:
                 print "run_epic: Unkown Paramer for Run 1", defs.ntt_type, defs.arch
                 exit()
             
-            # if console_print:
-            #     continue
+            if console_print:
+                continue
 
             # Bring Values to N KSH values L2
             main_chiplet.ksh_l2_cache.stats_accesses += main_chiplet.pe_array.ksh_file.size * defs.poly_n

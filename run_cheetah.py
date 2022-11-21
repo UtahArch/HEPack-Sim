@@ -36,8 +36,8 @@ with open("{}.m".format(network)) as fin:
             S[1] = int(temp[1].split(":")[-1].strip())
         elif "Dimensions" in line:
             param = {}
-            if console_print:
-                S = [1,1]
+            # if console_print:
+            #     S = [1,1]
                 # line = "Dimensions { K: 24, C: 96, R: 1, S: 1, Y:56, X:56 }"
                 # line = 'Dimensions { K: 1, C: 96, R: 3, S: 3, Y:56, X:56 }'
                 # line = 'Dimensions { K: 256, C: 64, R: 1, S: 1, Y: 56, X: 56 }'
@@ -72,22 +72,21 @@ with open("{}.m".format(network)) as fin:
 
             if XY < n_ckks:
                 XtYt = XY
-                if IF[2] > 1:
-                    while Ct < IF[2]:
-                        Ct *= 2
-                        if XtYt*Ct > n_ckks:
-                            break
-                    Ct /= 2
+                while Ct <= IF[2]:
+                    Ct *= 2
+                    if XtYt*Ct > n_ckks:
+                        break
+                Ct /= 2
             else:
                 XtYt = n_ckks
-            if Ct > W[2]:
-                print "ERROR Cheetah 1"
-                exit()
+            assert(Ct <= W[2])
+            assert(Ct*XtYt <= n_ckks)
 
             mult_loop=0
             if console_print:
                 print("XtYt:{:4d}\tCt:{:4d}\tRS*Ct:{:4d}\t\tPF:{:}\n".format(XtYt, Ct, W[1]*W[0]*Ct, (XtYt*Ct)/float(n_ckks)))
             assert(XtYt*Ct <= n_ckks)
+            assert(XtYt*Ct != 0)
 
             # Define Classes and globals
             defs.Ct = Ct

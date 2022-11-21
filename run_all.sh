@@ -1,11 +1,11 @@
-# for network in mobile resnet gnmt
+# for network in mobile resnet gnmt resnet20
 # do
 #     rm -rf data_${network}/*/*
 # done
 
-# for network in mobile resnet gnmt
+# for network in mobile resnet gnmt resnet20
 # do
-#     # python run_ngraph.py ${network} 1 &
+#     python run_ngraph.py ${network} 1 1 &
 #     for pack in hyena epic cheetah channel
 #     do
 #         for n in 1
@@ -18,19 +18,19 @@
 # done
 # wait
 
-for network in mobile resnet gnmt
-do
-    rm -rf data_${network}/ngraph*/*
-    rm -rf data_${network}/hyenaplus*/*
-done
+# for network in mobile resnet gnmt
+# do
+#     rm -rf data_${network}/ngraph*/*
+#     rm -rf data_${network}/hyenaplus*/*
+# done
 
-for network in mobile resnet gnmt
-do
-    for batch in 1 16 32 64 512
-    do
-        python run_ngraphplus.py ${network} ${batch} 1 &
-        python run_ngraph.py     ${network} ${batch} 1 &
-    done
-    wait
-done
-wait
+# for network in mobile resnet gnmt
+# do
+#     for batch in 1 16 32 64 512
+#     do
+#         python run_ngraphplus.py ${network} ${batch} 1 &
+#         python run_ngraph.py     ${network} ${batch} 1 &
+#     done
+#     wait
+# done
+# wait

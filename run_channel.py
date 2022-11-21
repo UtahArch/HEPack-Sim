@@ -36,17 +36,17 @@ with open("{}.m".format(network)) as fin:
             S[1] = int(temp[1].split(":")[-1].strip())
         elif "Dimensions" in line:
             param = {}
-            if console_print:
-                S = [1,1]
-                # line = "Dimensions { K: 24, C: 96, R: 1, S: 1, Y:56, X:56 }"
-                # line = 'Dimensions { K: 1, C: 96, R: 3, S: 3, Y:56, X:56 }'
-                # line = 'Dimensions { K: 256, C: 64, R: 1, S: 1, Y: 56, X: 56 }'
-                # line = "Dimensions { K: 1, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
-                # line = "Dimensions { K: 64, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
-                # line = "Dimensions { K: 1000, C: 2048, R: 7, S: 7, Y: 7, X: 7 }"
-                # line = "Dimensions { K: 1, C: 96, R: 3, S: 3, Y:112, X:112 }"
+            # if console_print:
+            #     S = [1,1]
+            #     # line = "Dimensions { K: 24, C: 96, R: 1, S: 1, Y:56, X:56 }"
+            #     # line = 'Dimensions { K: 1, C: 96, R: 3, S: 3, Y:56, X:56 }'
+            #     # line = 'Dimensions { K: 256, C: 64, R: 1, S: 1, Y: 56, X: 56 }'
+            #     # line = "Dimensions { K: 1, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
+            #     # line = "Dimensions { K: 64, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
+            #     # line = "Dimensions { K: 1000, C: 2048, R: 7, S: 7, Y: 7, X: 7 }"
+            #     # line = "Dimensions { K: 1, C: 96, R: 3, S: 3, Y:112, X:112 }"
 
-                line = "Dimensions { K: 64, C: 3, R: 7, S: 7, Y:224, X:224 }"
+            #     line = "Dimensions { K: 64, C: 3, R: 7, S: 7, Y:224, X:224 }"
 
             if console_print:
                 if line in done_params:
@@ -74,20 +74,18 @@ with open("{}.m".format(network)) as fin:
 
             # Pack Cts
             Ct = 1
-            if W[2] > 1:
-                while Ct < W[2]:
-                    Ct *= 2
-                    if RS*Ct*Ct > n_ckks:
-                        break
-                Ct /= 2
-            if Ct > W[2]:
-                print "ERROR Hyena 1"
-                exit()
+            while (Ct <= W[2]) and (Ct <= W[3]):
+                Ct *= 2
+                if RS*Ct*Ct > n_ckks:
+                    break
+            Ct /= 2
+            assert((Ct <= W[2]) and (Ct <= W[3]))
 
             inner_loop=0
             if console_print:
                 print("P:{:4d}\tRS:{:4d}\tCt:{:4d}\tRS*Ct*Ct:{:4d}\t\tPF:{:}\n".format(P, RS, Ct, W[1]*W[0]*Ct*Ct, (RS*Ct*Ct)/float(n_ckks)))
             assert(RS*Ct*Ct <= n_ckks)
+            assert(Ct != 0)
 
             # Define Classes and globals
             defs.Ct = Ct
@@ -108,8 +106,8 @@ with open("{}.m".format(network)) as fin:
                 print "run_cheetah: Unkown Paramer for Setup 1", defs.ntt_type, defs.arch
                 exit()
             
-            # if console_print:
-            #     continue
+            if console_print:
+                continue
 
             if_count = 0
             mult_count = 0
