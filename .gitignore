@@ -1,4 +1,5 @@
 data/
+.ipynb_checkpoints/
 data_*
 micro22.tar.gz
 temp*

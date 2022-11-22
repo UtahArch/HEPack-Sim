@@ -11,7 +11,7 @@ import packings
 import sys
 import os
 
-console_print = False
+console_print = True
 
 if console_print:
     os.system('clear')
@@ -45,6 +45,7 @@ with open("{}.m".format(network)) as fin:
             #     # line = "Dimensions { K: 64, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
             #     # line = "Dimensions { K: 1000, C: 2048, R: 7, S: 7, Y: 7, X: 7 }"
             #     # line = "Dimensions { K: 1, C: 96, R: 3, S: 3, Y:112, X:112 }"
+                # line = "Dimensions { K: 3072, C: 4096, Y: 320, X: 1, R: 1, S: 1 }"
             
             if console_print:
                 if line in done_params:
@@ -56,8 +57,8 @@ with open("{}.m".format(network)) as fin:
             for t in temp:
                 t = [x.strip() for x in t.split(":")]
                 param[t[0]] = int(t[1])
-            if console_print:
-                print name, param
+            # if console_print:
+            #     print name, param
 
             IF = (param['X'], param['Y'], param['C'])
             W  = (param['R'], param['S'], param['C'], param['K'])
@@ -93,8 +94,9 @@ with open("{}.m".format(network)) as fin:
 
             inner_loop=0
             if console_print:
-                print("XtYt:{:4d}\tCt   :{:4d}\t\tPF:{:}".format(XtYt, Ct, (XtYt*Ct)/float(n_ckks)))
-                print("Kt :{:4d}\tRS*Kt:{:4d}\t\tPF:{:}\n".format(Kt, W[1]*W[0]*Kt, (Kt*Ct*W[0]*W[1])/float(n_ckks)))
+                # print("XtYt:{:4d}\tCt   :{:4d}\t\tPF:{:}".format(XtYt, Ct, (XtYt*Ct)/float(n_ckks)))
+                # print("Kt :{:4d}\tRS*Kt:{:4d}\t\tPF:{:}\n".format(Kt, W[1]*W[0]*Kt, (Kt*Ct*W[0]*W[1])/float(n_ckks)))
+                print "IF:",(XtYt*Ct)/float(n_ckks), "::", "WT:",(W[0]*W[1]*Ct*Kt)/float(n_ckks)
             assert(XtYt*Ct <= n_ckks)
             assert(Kt*Ct*W[0]*W[1] <= n_ckks)
             assert(XtYt*Ct*Kt != 0)

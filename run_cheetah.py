@@ -11,7 +11,7 @@ import packings
 import sys
 import os
 
-console_print = False
+console_print = True
 
 if console_print:
     os.system('clear')
@@ -56,8 +56,9 @@ with open("{}.m".format(network)) as fin:
             for t in temp:
                 t = [x.strip() for x in t.split(":")]
                 param[t[0]] = int(t[1])
-            if console_print:
-                print name, param
+            
+            # if console_print:
+            #     print name, param
 
             IF = (param['X'], param['Y'], param['C'])
             W  = (param['R'], param['S'], param['C'], param['K'])
@@ -84,7 +85,8 @@ with open("{}.m".format(network)) as fin:
 
             mult_loop=0
             if console_print:
-                print("XtYt:{:4d}\tCt:{:4d}\tRS*Ct:{:4d}\t\tPF:{:}\n".format(XtYt, Ct, W[1]*W[0]*Ct, (XtYt*Ct)/float(n_ckks)))
+                # print("XtYt:{:4d}\tCt:{:4d}\tRS*Ct:{:4d}\t\tPF:{:}\n".format(XtYt, Ct, W[1]*W[0]*Ct, (XtYt*Ct)/float(n_ckks)))
+                print "IF:",(XtYt*Ct)/float(n_ckks), "::", "WT:",(1)/float(n_ckks)
             assert(XtYt*Ct <= n_ckks)
             assert(XtYt*Ct != 0)
 

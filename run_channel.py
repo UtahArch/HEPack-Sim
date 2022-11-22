@@ -11,7 +11,7 @@ import packings
 import sys
 import os
 
-console_print = False
+console_print = True
 
 if console_print:
     os.system('clear')
@@ -47,6 +47,7 @@ with open("{}.m".format(network)) as fin:
             #     # line = "Dimensions { K: 1, C: 96, R: 3, S: 3, Y:112, X:112 }"
 
             #     line = "Dimensions { K: 64, C: 3, R: 7, S: 7, Y:224, X:224 }"
+            # line = "Dimensions { K: 3072, C: 4096, Y: 320, X: 1, R: 1, S: 1 }"
 
             if console_print:
                 if line in done_params:
@@ -58,8 +59,8 @@ with open("{}.m".format(network)) as fin:
             for t in temp:
                 t = [x.strip() for x in t.split(":")]
                 param[t[0]] = int(t[1])
-            if console_print:
-                print name, param
+            # if console_print:
+            #     print name, param
 
             IF = (param['X'], param['Y'], param['C'])
             W  = (param['R'], param['S'], param['C'], param['K'])
@@ -83,7 +84,8 @@ with open("{}.m".format(network)) as fin:
 
             inner_loop=0
             if console_print:
-                print("P:{:4d}\tRS:{:4d}\tCt:{:4d}\tRS*Ct*Ct:{:4d}\t\tPF:{:}\n".format(P, RS, Ct, W[1]*W[0]*Ct*Ct, (RS*Ct*Ct)/float(n_ckks)))
+                # print("P:{:4d}\tRS:{:4d}\tCt:{:4d}\tRS*Ct*Ct:{:4d}\t\tPF:{:}\n".format(P, RS, Ct, W[1]*W[0]*Ct*Ct, (RS*Ct*Ct)/float(n_ckks)))
+                print "IF:",(RS*Ct)/float(n_ckks), "::", "WT:",(1*Ct*Ct)/float(n_ckks)
             assert(RS*Ct*Ct <= n_ckks)
             assert(Ct != 0)
 

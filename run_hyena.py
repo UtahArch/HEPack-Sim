@@ -12,7 +12,7 @@ import math
 import sys
 import os
 
-console_print = False
+console_print = True
 
 if console_print:
     os.system('clear')
@@ -60,9 +60,9 @@ with open("{}.m".format(network)) as fin:
             for t in temp:
                 t = [x.strip() for x in t.split(":")]
                 param[t[0]] = int(t[1])
-            if console_print:
-                print ""
-                print name, param
+            # if console_print:
+            #     print ""
+            #     print name, param
 
             IF = (param['X'], param['Y'], param['C'])
             W  = (param['R'], param['S'], param['C'], param['K'])
@@ -100,8 +100,9 @@ with open("{}.m".format(network)) as fin:
             psum_loop = 0
             if_loop = 0
             if console_print:
-                print("P  :{:4d}\tM     :{:4d}\tMt    :{:4d}\tCt:{:4d}\t\tIF-PE:{:}".format(P, M, Mt, Ct, (Mt*RS*Ct)/float(n_ckks)))
-                print("Kt:{:4d}\tIFR   :{:4d}\tRS*Kt:{:4d}\tIR :{:4d}\t\tWT-PE:{:}".format(Kt, if_replication, W[1]*W[0]*Kt, if_replication, (Kt*Ct*W[0]*W[1])/float(n_ckks)))
+                # print("P  :{:4d}\tM     :{:4d}\tMt    :{:4d}\tCt:{:4d}\t\tIF-PE:{:}".format(P, M, Mt, Ct, (Mt*RS*Ct)/float(n_ckks)))
+                # print("Kt:{:4d}\tIFR   :{:4d}\tRS*Kt:{:4d}\tIR :{:4d}\t\tWT-PE:{:}".format(Kt, if_replication, W[1]*W[0]*Kt, if_replication, (Kt*Ct*W[0]*W[1])/float(n_ckks)))
+                print "IF:",(Mt*RS*Ct*if_replication)/float(n_ckks), "::", "WT:",(Kt*Ct*W[0]*W[1])/float(n_ckks)
             assert(Mt*RS*Ct*if_replication <= n_ckks)
             assert(Kt*Ct*W[0]*W[1] <= n_ckks)
             assert(Kt*Ct*Mt*if_replication != 0)
