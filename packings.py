@@ -39,13 +39,13 @@ class Chiplet(elements.PE_Basic):
 
         self.perms = 0
         self.autom = 0
-        self.data_movmt = 0
+        self.data_movmt = {"IF":0, "WT":0, "KSH":0}
         
     def print_stats_console(self, IF, W, S):
         print IF[0], IF[1], IF[2]
         print W[0], W[1], W[2], W[3]
         print S[0], S[1]
-        if 'ngraph' not in defs.packing:
+        if ('ngraph' not in defs.packing) and ('lion' not in defs.packing):
             for x in self.mult_pipe:
                 print x[0], x[1], "::",
             print
@@ -813,3 +813,208 @@ class Chiplet(elements.PE_Basic):
             self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size * runs
         else:
             self.memory.stats_accesses += self.pe_array.ksh_file.size * runs
+
+    
+    
+    
+    # Gala
+
+    # IF Permutation is a separate sequence
+        # NI1   | 
+        # TR1   - F1 NTT
+        # NI2   | 
+        # SH1     -     
+        # TI1     | Permute IF  
+        # SH2     | in coeff domain
+        # TI2     -
+        # NT1   |
+        # TR2   - F1 I-NTT
+        # NT2   |
+        # KSI - KSH*IF
+
+    ## Setup 
+    def setup_gala_f1_f1(self):
+        # Due to the complicated nature of the system, there can be no "pipelining" done
+        defs.cycle_time = 1 
+
+        # Multiply is going to involve just
+        # a IF*WT that is going to get accumulated
+        # which will be a sequence of many MULs
+        self.mult_pipe = [("MUL",self.pe_array.op_mul_if_wt_cycles())]
+        self.mult_pipe_cost = self.pe_array.op_mul_if_wt_cycles()
+
+        # PSUM Rotation is going to involve
+        # KSH * PSUM
+        # SH1     -     
+        # TI1     | Permute PSUM
+        # SH2     | in Eval domain
+        # TI2     -
+        # Which is a one time cost
+        self.psum_pipe = [
+            ("SH1",self.pe_array.op_shift_cycles("psum")),
+            ("TI1",self.pe_array.op_transpose_cycles("psum")),
+            ("SH2",self.pe_array.op_shift_cycles("psum")),
+            ("TI2",self.pe_array.op_transpose_cycles("psum")),
+
+            ("KSH",self.pe_array.op_ksh_psum_cycles())
+        ]
+        self.psum_pipe_cost = sum([x[1] for x in self.psum_pipe])
+
+        # IF Rotation is going to involve
+        # KSH * IF
+        # SH1     -     
+        # TI1     | Permute IF
+        # SH2     | in Eval domain
+        # TI2     -
+        # This can be pipelined
+        self.if_seq = [
+            ("SH1",self.pe_array.op_shift_cycles("if")),
+            ("TI1",self.pe_array.op_transpose_cycles("if")),
+            ("SH2",self.pe_array.op_shift_cycles("if")),
+            ("TI2",self.pe_array.op_transpose_cycles("if")),
+
+            ("KSH",self.pe_array.op_ksh_if_cycles())
+        ]
+        self.if_seq_cost = max([x[1] for x in self.if_seq])
+    
+    def calc_gala_pseudo(self):
+        self.autom = self.mult_pipe_counts + self.psum_pipe_counts + self.if_seq_counts
+
+    # Run Hyena for all wts and ifs that are packed
+    def run_gala_mult_pipe_f1_f1(self, runs):
+
+        self.mult_pipe_counts += runs
+        self.cycles += runs * self.mult_pipe_cost
+
+        self.pe_array.op_mul_if_wt(runs)
+
+        # Access the wts for each RS value next rotation
+        self.pe_array.wt_file.stats_accesses += self.pe_array.wt_file.size * runs
+        self.memory.stats_accesses += self.pe_array.wt_file.size * runs
+
+    # Collate all psums present in it
+    def run_gala_psum_pipe_f1_f1(self, runs):
+
+        self.psum_pipe_counts += runs
+        self.cycles += runs * self.psum_pipe_cost
+
+        self.pe_array.op_shift("psum",runs)
+        self.pe_array.op_transpose("psum",runs)
+        self.pe_array.op_shift("psum",runs)
+        self.pe_array.op_transpose("psum",runs)
+
+        self.pe_array.op_ksh_psum(runs)
+
+        # Access the ksh for the next rotation
+        if defs.num_chiplets == 1:
+            self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size * runs
+        else:
+            self.memory.stats_accesses += self.pe_array.ksh_file.size * runs
+    
+    # Permute the IF
+    def run_gala_if_seq_f1_f1(self, runs):
+        
+        self.if_seq_counts += runs
+        self.cycles += runs * self.if_seq_cost
+        
+        self.pe_array.op_shift("if",runs)
+        self.pe_array.op_transpose("if",runs)
+        self.pe_array.op_shift("if",runs)
+        self.pe_array.op_transpose("if",runs)
+
+        self.pe_array.op_ksh_if(runs)
+
+        # Access the ksh for the next rotation
+        if defs.num_chiplets == 1:
+            self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size * runs
+        else:
+            self.memory.stats_accesses += self.pe_array.ksh_file.size * runs
+    
+    ## Setup 
+    def setup_gala_f1_hyena(self):
+        # Due to the complicated nature of the system, there can be no "pipelining" done
+        defs.cycle_time = 1 
+
+        # Multiply is going to involve just
+        # a IF*WT that is going to get accumulated
+        # which will be a sequence of many MULs
+        self.mult_pipe = [("MUL",self.pe_array.op_mul_if_wt_cycles())]
+        self.mult_pipe_cost = self.pe_array.op_mul_if_wt_cycles()
+
+        # PSUM Rotation is going to involve
+        # KSH * PSUM
+        # PRP - Permute PSum in Eval Domain
+        # This is a one time cost
+        self.psum_pipe = [
+            ("PRP",self.pe_array.op_permute_cycles("psum")),
+
+            ("KSH",self.pe_array.op_ksh_psum_cycles())
+        ]
+        self.psum_pipe_cost = sum([x[1] for x in self.psum_pipe])
+
+        # IF Rotation is going to involve
+        # KSH * IF
+        # PRP - Permute IF in Eval Domain
+        # This can be pipelined
+        self.if_seq = [
+            ("PRP",self.pe_array.op_permute_cycles("if")),
+
+            ("KSH",self.pe_array.op_ksh_if_cycles())
+        ]
+        self.if_seq_cost = max([x[1] for x in self.if_seq])
+
+    # Run Hyena for all wts and ifs that are packed
+    def run_gala_mult_pipe_f1_hynea(self, runs):
+
+        self.mult_pipe_counts += runs
+        self.cycles += runs * self.mult_pipe_cost
+
+        self.pe_array.op_mul_if_wt(runs)
+
+        # Access the wts for each RS value next rotation
+        self.pe_array.wt_file.stats_accesses += self.pe_array.wt_file.size * runs
+        self.memory.stats_accesses += self.pe_array.wt_file.size * runs
+
+    # Collate all psums present in it
+    def run_gala_psum_pipe_f1_hynea(self, runs):
+
+        self.psum_pipe_counts += runs
+        self.cycles += runs * self.psum_pipe_cost
+
+        self.pe_array.op_permute('psum', runs)
+
+        self.pe_array.op_ksh_psum(runs)
+
+        # Access the ksh for the next rotation
+        if defs.num_chiplets == 1:
+            self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size * runs
+        else:
+            self.memory.stats_accesses += self.pe_array.ksh_file.size * runs
+    
+    # Permute the IF
+    def run_gala_if_seq_f1_hynea(self, runs):
+        
+        self.if_seq_counts += runs
+        self.cycles += runs * self.if_seq_cost
+        
+        self.pe_array.op_permute('if', runs)
+
+        self.pe_array.op_ksh_if(runs)
+
+        # Access the ksh for the next rotation
+        if defs.num_chiplets == 1:
+            self.ksh_l2_cache.stats_accesses += self.pe_array.ksh_file.size * runs
+        else:
+            self.memory.stats_accesses += self.pe_array.ksh_file.size * runs
+
+    # Lion-HE Packing
+    
+    ## Lion is only going to be limited by the number of multiplications it can do
+    def setup_lion(self, cycle_param):
+        defs.cycle_time = cycle_param
+    
+    ## Run for all wts
+    def run_lion(self, runs):
+        self.mult_pipe_counts += runs
+        self.cycles += runs
+        self.pe_array.op_mul_if_wt(runs)

@@ -11,7 +11,7 @@ import packings
 import sys
 import os
 
-console_print = True
+console_print = False
 
 if console_print:
     os.system('clear')
@@ -170,8 +170,9 @@ with open("{}.m".format(network)) as fin:
                         # Data Movement
                         # 1 IF & Wt
                         # RSKt KSH
-                        main_chiplet.data_movmt += main_chiplet.pe_array.if_file.size + main_chiplet.pe_array.wt_file.size
-                        main_chiplet.data_movmt += main_chiplet.pe_array.ksh_file.size * (W[1]*W[0]*Kt)
+                        main_chiplet.data_movmt["IF"] += main_chiplet.pe_array.if_file.size 
+                        main_chiplet.data_movmt["WT"] += main_chiplet.pe_array.wt_file.size
+                        main_chiplet.data_movmt["KSH"] += main_chiplet.pe_array.ksh_file.size * (W[1]*W[0]*Kt)
                     
                     # Flush PSUM to memory
                     main_chiplet.pe_array.psum_file.stats_accesses += main_chiplet.pe_array.psum_file.size

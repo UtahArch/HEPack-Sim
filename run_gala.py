@@ -1,7 +1,7 @@
 #################################################################################
 ##  Main file for running sumulations
 ##
-##  Running Channel Packing
+##  Running Gala Packing
 ##
 ##
 #################################################################################
@@ -91,7 +91,7 @@ with open("{}.m".format(network)) as fin:
 
             # Define Classes and globals
             defs.Ct = Ct
-            defs.packing = "channel"
+            defs.packing = "gala"
             defs.ntt_type = ntttype
             defs.arch = arch
             defs.batch_size = batch
@@ -101,9 +101,9 @@ with open("{}.m".format(network)) as fin:
             main_chiplet = packings.Chiplet()
             
             if defs.ntt_type == 'f1' and defs.arch == 'f1':
-                main_chiplet.setup_channel_f1_f1()
+                main_chiplet.setup_gala_f1_f1()
             elif defs.ntt_type == 'f1' and defs.arch == 'hyena':
-                main_chiplet.setup_channel_f1_hyena()
+                main_chiplet.setup_gala_f1_hyena()
             else:
                 print "run_cheetah: Unkown Paramer for Setup 1", defs.ntt_type, defs.arch
                 exit()
@@ -119,11 +119,12 @@ with open("{}.m".format(network)) as fin:
             main_chiplet.ksh_l2_cache.stats_accesses += main_chiplet.pe_array.ksh_file.size * defs.poly_n
             main_chiplet.memory.stats_accesses += main_chiplet.pe_array.ksh_file.size * defs.poly_n
 
-            # Perform Channel
+            # Perform Gala
             # For every output feature point
             for of in range(P):
-
-                # for all channel steps
+                
+                iters_if = 0
+                # Generate All IF rotations
                 for c_step in range(0, W[2], Ct):
 
                     # Load IF from Memory
@@ -132,13 +133,13 @@ with open("{}.m".format(network)) as fin:
 
                     # Data Movement
                     # 1 IF
-                    main_chiplet.data_movmt["IF"] += main_chiplet.pe_array.if_file.size
+                    main_chiplet.data_movmt += main_chiplet.pe_array.if_file.size
 
-                    for iters_if in range(RS):
+                    for _ in range(RS):
                         if_count += 1
                         # Data Movement
                         # 1 KSH
-                        main_chiplet.data_movmt["KSH"] += main_chiplet.pe_array.ksh_file.size
+                        main_chiplet.data_movmt += main_chiplet.pe_array.ksh_file.size
 
                         # Store Rotated IFs in L2 if they fit
                         if iters_if < defs.max_if_on_chiplt:
@@ -147,46 +148,46 @@ with open("{}.m".format(network)) as fin:
                         else:
                             main_chiplet.memory.stats_accesses += main_chiplet.pe_array.if_file.size
                         
-                    for iters_k in range(0, W[3], Ct):
-                        
-                        for iters_ct in range(Ct):
-                            
-                            for iters_mul in range(RS):
-                                # Access Rotated Ifs from L2 if they fit
-                                if iters_mul < defs.max_if_on_chiplt:
-                                    main_chiplet.if_l2_cache.stats_accesses += main_chiplet.pe_array.if_file.size
-                                    iters_if += 1
-                                else:
-                                    main_chiplet.memory.stats_accesses += main_chiplet.pe_array.if_file.size
-                                mult_count += 1
-                                
-                                # Data Movement
-                                # 1 IF W
-                                main_chiplet.data_movmt["IF"] += main_chiplet.pe_array.if_file.size
-                                main_chiplet.data_movmt["WT"] += main_chiplet.pe_array.wt_file.size
-                            
-                            psum_count += 1
-                            # Data Movement
-                            # 1 KSH
-                            main_chiplet.data_movmt["KSH"] += main_chiplet.pe_array.ksh_file.size
+                # Generate each OF
 
+                for iters_k in range(0, W[3], Ct):
+                    
+                    for iters_ct in range(Ct):
+
+                        for iters_mul in range(0, RS*W[2], Ct):
+                            # Access Rotated Ifs from L2 if they fit
+                            if iters_mul < defs.max_if_on_chiplt:
+                                main_chiplet.if_l2_cache.stats_accesses += main_chiplet.pe_array.if_file.size
+                                iters_if += 1
+                            else:
+                                main_chiplet.memory.stats_accesses += main_chiplet.pe_array.if_file.size
+                            mult_count += 1
+                            
+                            # Data Movement
+                            # 1 IF W
+                            main_chiplet.data_movmt += main_chiplet.pe_array.if_file.size + main_chiplet.pe_array.wt_file.size
+                        
+                        psum_count += 1
+                        # Data Movement
+                        # 1 KSH
+                        main_chiplet.data_movmt += main_chiplet.pe_array.ksh_file.size
                         # Flush PSUM to memory
                         main_chiplet.pe_array.psum_file.stats_accesses += main_chiplet.pe_array.psum_file.size
                         main_chiplet.memory.stats_accesses += main_chiplet.pe_array.psum_file.size
 
             if defs.ntt_type == 'f1' and defs.arch == 'f1':
-                main_chiplet.run_channel_mult_pipe_f1_f1(mult_count)
-                main_chiplet.run_channel_psum_pipe_f1_f1(psum_count)
-                main_chiplet.run_channel_if_seq_f1_f1(if_count)
+                main_chiplet.run_gala_mult_pipe_f1_f1(mult_count)
+                main_chiplet.run_gala_psum_pipe_f1_f1(psum_count)
+                main_chiplet.run_gala_if_seq_f1_f1(if_count)
             elif defs.ntt_type == 'f1' and defs.arch == 'hyena':
-                main_chiplet.run_channel_mult_pipe_f1_hynea(mult_count)
-                main_chiplet.run_channel_psum_pipe_f1_hynea(psum_count)
-                main_chiplet.run_channel_if_seq_f1_hynea(if_count)
+                main_chiplet.run_gala_mult_pipe_f1_hynea(mult_count)
+                main_chiplet.run_gala_psum_pipe_f1_hynea(psum_count)
+                main_chiplet.run_gala_if_seq_f1_hynea(if_count)
             else:
-                print "run_channel: Unkown Paramer for Run 1", defs.ntt_type, defs.arch
+                print "run_gala: Unkown Paramer for Run 1", defs.ntt_type, defs.arch
                 exit()
 
-            main_chiplet.calc_channel_pseudo()
+            main_chiplet.calc_gala_pseudo()
             if console_print:
                 main_chiplet.print_stats_console(IF, W, S)
                 break

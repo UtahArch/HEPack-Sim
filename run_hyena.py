@@ -12,7 +12,7 @@ import math
 import sys
 import os
 
-console_print = True
+console_print = False
 
 if console_print:
     os.system('clear')
@@ -60,9 +60,9 @@ with open("{}.m".format(network)) as fin:
             for t in temp:
                 t = [x.strip() for x in t.split(":")]
                 param[t[0]] = int(t[1])
-            # if console_print:
-            #     print ""
-            #     print name, param
+            if console_print:
+                print ""
+                print name, param
 
             IF = (param['X'], param['Y'], param['C'])
             W  = (param['R'], param['S'], param['C'], param['K'])
@@ -99,10 +99,10 @@ with open("{}.m".format(network)) as fin:
             mult_loop = 0
             psum_loop = 0
             if_loop = 0
-            if console_print:
-                # print("P  :{:4d}\tM     :{:4d}\tMt    :{:4d}\tCt:{:4d}\t\tIF-PE:{:}".format(P, M, Mt, Ct, (Mt*RS*Ct)/float(n_ckks)))
-                # print("Kt:{:4d}\tIFR   :{:4d}\tRS*Kt:{:4d}\tIR :{:4d}\t\tWT-PE:{:}".format(Kt, if_replication, W[1]*W[0]*Kt, if_replication, (Kt*Ct*W[0]*W[1])/float(n_ckks)))
-                print "IF:",(Mt*RS*Ct*if_replication)/float(n_ckks), "::", "WT:",(Kt*Ct*W[0]*W[1])/float(n_ckks)
+            # if console_print:
+            #     # print("P  :{:4d}\tM     :{:4d}\tMt    :{:4d}\tCt:{:4d}\t\tIF-PE:{:}".format(P, M, Mt, Ct, (Mt*RS*Ct)/float(n_ckks)))
+            #     # print("Kt:{:4d}\tIFR   :{:4d}\tRS*Kt:{:4d}\tIR :{:4d}\t\tWT-PE:{:}".format(Kt, if_replication, W[1]*W[0]*Kt, if_replication, (Kt*Ct*W[0]*W[1])/float(n_ckks)))
+            #     print "IF:",(Mt*RS*Ct*if_replication)/float(n_ckks), "::", "WT:",(Kt*Ct*W[0]*W[1])/float(n_ckks)
             assert(Mt*RS*Ct*if_replication <= n_ckks)
             assert(Kt*Ct*W[0]*W[1] <= n_ckks)
             assert(Kt*Ct*Mt*if_replication != 0)
@@ -119,7 +119,7 @@ with open("{}.m".format(network)) as fin:
             defs.num_chiplets = defs.poly_n / (defs.pe_size)
 
             main_chiplet = packings.Chiplet()
-            main_chiplet = packings.Chiplet()
+            
             if defs.ntt_type == 'f1' and defs.arch == 'f1':
                 main_chiplet.setup_hyena_f1_f1(RS*Ct, W[2], W[3])
             elif defs.ntt_type == 'f1' and defs.arch == 'hyena':
@@ -128,8 +128,8 @@ with open("{}.m".format(network)) as fin:
                 print "run_hyena: Unkown Paramer for Run 1", defs.ntt_type, defs.arch
                 exit()
 
-            if console_print:
-                continue
+            # if console_print:
+            #     continue
 
             # Bring Values to N KSH values L2
             main_chiplet.ksh_l2_cache.stats_accesses += main_chiplet.pe_array.ksh_file.size * defs.poly_n
@@ -176,13 +176,14 @@ with open("{}.m".format(network)) as fin:
 
                             # Data Movement
                             # 1 IF & Wt
-                            main_chiplet.data_movmt += main_chiplet.pe_array.if_file.size + main_chiplet.pe_array.wt_file.size
+                            main_chiplet.data_movmt["IF"] += main_chiplet.pe_array.if_file.size 
+                            main_chiplet.data_movmt["WT"] += main_chiplet.pe_array.wt_file.size
                         
                         psum_loop += RS*Ct
                         
                         # Data Movement
                         # RSCt KSH
-                        main_chiplet.data_movmt += main_chiplet.pe_array.ksh_file.size * (RS*Ct)
+                        main_chiplet.data_movmt["KSH"] += main_chiplet.pe_array.ksh_file.size * (RS*Ct)
 
                         # Flush PSUM to memory
                         main_chiplet.pe_array.psum_file.stats_accesses += main_chiplet.pe_array.psum_file.size
@@ -203,7 +204,7 @@ with open("{}.m".format(network)) as fin:
                             if_loop += 1
                             # Data Movement
                             # 1 KSH
-                            main_chiplet.data_movmt += main_chiplet.pe_array.ksh_file.size 
+                            main_chiplet.data_movmt["KSH"] += main_chiplet.pe_array.ksh_file.size 
 
             if defs.ntt_type == 'f1' and defs.arch == 'f1':
                 main_chiplet.run_hyena_mult_pipe_f1_f1(mult_loop)
@@ -219,7 +220,8 @@ with open("{}.m".format(network)) as fin:
 
             main_chiplet.calc_hyena_pseudo()
             if console_print:
-                main_chiplet.print_stats_console(IF, W, S)
-                break
+                # main_chiplet.print_stats_console(IF, W, S)
+                # break
+                print main_chiplet.memory.stats_accesses
             else:
                 main_chiplet.print_stats_file(IF, W, S, name, network)

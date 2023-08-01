@@ -11,7 +11,7 @@ import packings
 import sys
 import os
 
-console_print = True
+console_print = False
 
 if console_print:
     os.system('clear')
@@ -147,8 +147,9 @@ with open("{}.m".format(network)) as fin:
                         # Data Movement
                         # 1 IF
                         # RSCt Wts & KSH
-                        main_chiplet.data_movmt += main_chiplet.pe_array.if_file.size
-                        main_chiplet.data_movmt += (main_chiplet.pe_array.wt_file.size + main_chiplet.pe_array.ksh_file.size) * (W[1]*W[0]*Ct)
+                        main_chiplet.data_movmt["IF"] += main_chiplet.pe_array.if_file.size
+                        main_chiplet.data_movmt["WT"] += (main_chiplet.pe_array.wt_file.size) * (W[1]*W[0]*Ct)
+                        main_chiplet.data_movmt["KSH"] += main_chiplet.pe_array.ksh_file.size * (W[1]*W[0]*Ct)
 
             if defs.ntt_type == 'f1' and defs.arch == 'f1':
                 main_chiplet.run_cheetah_f1_f1(mult_loop)
