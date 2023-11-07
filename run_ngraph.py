@@ -1,9 +1,9 @@
 #################################################################################
 ##  Main file for running sumulations
+##  Running Packing based on NGraph-HE
 ##
-##  Running Cheetah Packing
-##
-##
+##  Usage: python run_ngraph.py <network> <poly_n> <batch>
+##  Example: python run_ngraph.py resnet 1 1
 #################################################################################
  
 import defs

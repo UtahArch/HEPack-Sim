@@ -1,9 +1,9 @@
 #################################################################################
 ##  Main file for running sumulations
-##
 ##  Running Gala Packing
 ##
-##
+##  Usage: python run_gala.py <network> <ntttype> <arch> <poly_n>
+##  Example: python run_gala.py resnet f1 f1 1
 #################################################################################
  
 import defs

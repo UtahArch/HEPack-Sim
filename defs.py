@@ -1,9 +1,9 @@
 #################################################################################
-##  Defining all the values being used
-##
-##
-##
-##
+##   Defines architectural and secutrity parameters used for the simulation
+##   Change packing, ntt_type, arch to vary the simulation runs
+##   
+##  
+##   TODO: Remove Legacy Parameters
 #################################################################################
 
 # Global Definitions
@@ -13,33 +13,33 @@ Kt = None
 Ct = None
 Bt = 1
 
-packing    = "cheetah"
-ntt_type   = "baseline"
-arch       = "f1"
+packing    = "cheetah"      # Packing Scheme
+ntt_type   = "baseline"     # NTT Type
+arch       = "f1"           # Accelerator Hardware
 poly_n     = 1024
 batch_size = 1
 num_chiplets  = None
 
 # Arch Choices
 pe_size        = 1024
-transpose_f1    = 32     # Rotation for n = 1024
-shift_f1        = 1
-permute_hyena   = 1      # Benes network FTW!
+transpose_f1    = 32     # Rotation for n = 1024 in ticks
+shift_f1        = 1      # In ticks
+permute_hyena   = 1      # Benes network FTW, in ticks
 
 # Processor
-cycle_time = None     # In Ticks
+cycle_time = None     # In Ticks defined by arch choices
 tick_time  = 1        # In ns
 
 # PE
 
 ## MACs
-mac_num         = poly_n*2
-mul_exec_time   = 5     # In Ticks
-add_exec_time   = 0     
+mac_num         = poly_n*2  # Since CKKS is complex
+mul_exec_time   = 5         # In Ticks
+add_exec_time   = 0         # Since we use MAC units Add is free
 
-## L1 Caches
+## L1 Caches                 # These are techinically registers inside MAC units so reads and writes are immediate
 if_file_size    = poly_n*2   # Num of 8 b registers / cache blocks
-if_file_read    = 0
+if_file_read    = 0          
 if_file_write   = 0
 
 wt_file_size    = poly_n     # Num of 8 b registers / cache blocks
@@ -70,7 +70,7 @@ twicoef_write   = 0
 # Chiplet
 
 ## L2 Caches
-max_c_on_chiplt   = 512
+max_c_on_chiplt   = 512             # Max number of channels that can be supported on chiplet
 max_ksh_on_chiplt = 1024
 max_wt_on_chiplt  = max_c_on_chiplt
 max_if_on_chiplt  = max_c_on_chiplt

@@ -1,7 +1,7 @@
 #################################################################################
-##  All definitions for the different packings required to perform FHE
+##  All definitions for the different packings and pipelines implemented
 ##  
-##  Has definition of a chiplet
+##  
 ##  
 ##  
 #################################################################################

@@ -1,9 +1,9 @@
 #################################################################################
 ##  Main file for running sumulations
-##
 ##  Running Cheetah Packing
 ##
-##
+##  Usage: python run_cheetah.py <network> <ntttype> <arch> <poly_n>
+##  Example: python run_cheetah.py resnet f1 f1 1
 #################################################################################
  
 import defs

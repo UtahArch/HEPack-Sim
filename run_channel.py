@@ -1,9 +1,9 @@
 #################################################################################
 ##  Main file for running sumulations
-##
 ##  Running Channel Packing
-##
-##
+##  
+##  Usage: python run_channel.py <network> <ntttype> <arch> <poly_n>
+##  Example: python run_channel.py resnet f1 f1 1
 #################################################################################
  
 import defs

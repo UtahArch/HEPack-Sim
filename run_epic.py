@@ -1,9 +1,9 @@
 #################################################################################
 ##  Main file for running sumulations
+##  Running Epic Packing
 ##
-##  Running EPIC Packing
-##
-##
+##  Usage: python run_epic.py <network> <ntttype> <arch> <poly_n>
+##  Example: python run_epic.py resnet f1 f1 1
 #################################################################################
  
 import defs

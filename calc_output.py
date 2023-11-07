@@ -1,9 +1,10 @@
 #################################################################################
-##  Main file for running sumulations
-##
-##  Running Hyena Packing
-##
-##
+##  Calculates the total number of output neurons present for every layer. 
+##  Used for computing the communication cost.
+##  Refer to charts.ipyb # Communication for more details.  
+##  
+##  Usage: python calc_output.py <network_name>
+##  Example: python calc_output.py gnmt
 #################################################################################
  
 import defs

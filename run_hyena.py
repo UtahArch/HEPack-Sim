@@ -1,9 +1,9 @@
 #################################################################################
 ##  Main file for running sumulations
-##
 ##  Running Hyena Packing
 ##
-##
+##  Usage: python run_hyena.py <network> <ntttype> <arch> <poly_n>
+##  Example: python run_hyena.py resnet f1 f1 1
 #################################################################################
  
 import defs

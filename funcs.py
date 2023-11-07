@@ -2,7 +2,7 @@
 ##  All definitions for the different functions required to perform FHE
 ##  done associated with the PE basic
 ##  
-##  Coding: All Writes are hidden
+##  
 ##  
 #################################################################################
 

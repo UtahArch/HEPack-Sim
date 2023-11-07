@@ -1,9 +1,9 @@
 #################################################################################
 ##  Main file for running sumulations
+##  Running Cheetah-2PC Packing
 ##
-##  Running Cheetah 2 Packing
-##
-##
+##  Usage: python run_lion.py <network> <ntttype> <arch> <poly_n>
+##  Example: python run_lion.py resnet f1 f1 1
 #################################################################################
  
 import defs
