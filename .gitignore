@@ -1,5 +1,7 @@
 data/
 .ipynb_checkpoints/
+*.svg
+*.log
 data_*
 micro22.tar.gz
 temp*

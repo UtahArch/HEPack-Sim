@@ -12,7 +12,7 @@ import math
 import sys
 import os
 
-console_print = True
+console_print = False
 
 if console_print:
     os.system('clear')
@@ -159,7 +159,7 @@ with open("{}.m".format(network)) as fin:
                 main_chiplet.memory.stats_accesses += int(math.ceil(main_chiplet.pe_array.wt_file.size * min(defs.max_wt_on_chiplt, W[2]/Ct * W[3]/Kt)))
                 main_chiplet.wt_l2_cache.stats_accesses += int(math.ceil(main_chiplet.pe_array.wt_file.size * min(defs.max_wt_on_chiplt, W[2]/Ct * W[3]/Kt)))
 
-                for non_over_mat in range((W[0]-1)*(W[1]-1)/(S[0]*S[1]) + 1):  # Permute to create all overlappingmatrices
+                for non_over_mat in range(min((W[0]-1)*(W[1]-1)/(S[0]*S[1])+1, P)):  # Permute to create all overlappingmatrices
 
                     iters_wt_inner = 0
 
@@ -189,13 +189,15 @@ with open("{}.m".format(network)) as fin:
 
                             # Data Movement
                             # 1 IF & Wt
-                            main_chiplet.data_movmt += main_chiplet.pe_array.if_file.size + main_chiplet.pe_array.wt_file.size
+                            # TODO: Commented for version differences
+                            # main_chiplet.data_movmt += main_chiplet.pe_array.if_file.size + main_chiplet.pe_array.wt_file.size
                         
                         psum_loop += RS*Ct
                         
                         # Data Movement
                         # RSCt KSH
-                        main_chiplet.data_movmt += main_chiplet.pe_array.ksh_file.size * (RS*Ct)
+                        # TODO: Commented for version differences
+                        # main_chiplet.data_movmt += main_chiplet.pe_array.ksh_file.size * (RS*Ct)
 
                         # Flush PSUM to memory
                         main_chiplet.pe_array.psum_file.stats_accesses += main_chiplet.pe_array.psum_file.size
@@ -216,7 +218,8 @@ with open("{}.m".format(network)) as fin:
                             if_loop += 1
                             # Data Movement
                             # 1 KSH
-                            main_chiplet.data_movmt += main_chiplet.pe_array.ksh_file.size
+                            # TODO: Commented for version differences
+                            # main_chiplet.data_movmt += main_chiplet.pe_array.ksh_file.size
 
             if defs.ntt_type == 'f1' and defs.arch == 'f1':
                 main_chiplet.run_hyena_mult_pipe_f1_f1(mult_loop)

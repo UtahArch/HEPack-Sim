@@ -10,6 +10,7 @@ import defs
 import packings
 import sys
 import os
+import math
 
 console_print = False
 
@@ -81,6 +82,8 @@ with open("{}.m".format(network)) as fin:
                     break
             Ct /= 2
             assert((Ct <= W[2]) and (Ct <= W[3]))
+            # Pack Faces
+            Pt = int(n_ckks/(RS*Ct*Ct))    
 
             inner_loop=0
             if console_print:
@@ -121,7 +124,7 @@ with open("{}.m".format(network)) as fin:
 
             # Perform Gala
             # For every output feature point
-            for of in range(P):
+            for of in range(int(math.ceil(float(P)/Pt))):
                 
                 iters_if = 0
                 # Generate All IF rotations
@@ -133,13 +136,13 @@ with open("{}.m".format(network)) as fin:
 
                     # Data Movement
                     # 1 IF
-                    main_chiplet.data_movmt += main_chiplet.pe_array.if_file.size
+                    main_chiplet.data_movmt["IF"] += main_chiplet.pe_array.if_file.size
 
                     for _ in range(RS):
                         if_count += 1
                         # Data Movement
                         # 1 KSH
-                        main_chiplet.data_movmt += main_chiplet.pe_array.ksh_file.size
+                        main_chiplet.data_movmt["KSH"] += main_chiplet.pe_array.ksh_file.size
 
                         # Store Rotated IFs in L2 if they fit
                         if iters_if < defs.max_if_on_chiplt:
@@ -165,12 +168,13 @@ with open("{}.m".format(network)) as fin:
                             
                             # Data Movement
                             # 1 IF W
-                            main_chiplet.data_movmt += main_chiplet.pe_array.if_file.size + main_chiplet.pe_array.wt_file.size
+                            main_chiplet.data_movmt["IF"] += main_chiplet.pe_array.if_file.size
+                            main_chiplet.data_movmt["WT"] += main_chiplet.pe_array.wt_file.size
                         
                         psum_count += 1
                         # Data Movement
                         # 1 KSH
-                        main_chiplet.data_movmt += main_chiplet.pe_array.ksh_file.size
+                        main_chiplet.data_movmt["KSH"] += main_chiplet.pe_array.ksh_file.size
                         # Flush PSUM to memory
                         main_chiplet.pe_array.psum_file.stats_accesses += main_chiplet.pe_array.psum_file.size
                         main_chiplet.memory.stats_accesses += main_chiplet.pe_array.psum_file.size

@@ -57,7 +57,11 @@ with open("{}.m".format(network)) as fin:
             S[0] = int(temp[0].split(":")[-1].strip())
             S[1] = int(temp[1].split(":")[-1].strip())
         elif "Dimensions" in line:
-            param = {}            
+            param = {}         
+            if console_print:
+                S = [1,1]
+                line = "Dimensions { K: 1000, C: 1280, R: 7, S: 7, Y: 7, X: 7 }"
+
             temp = line.split("{")[1].split("}")[0].split(",")
             for t in temp:
                 t = [x.strip() for x in t.split(":")]
@@ -157,7 +161,7 @@ with open("{}.m".format(network)) as fin:
             
             main_chiplet.run_lion(mul_count)
             if console_print:
-                # main_chiplet.print_stats_console(IF, W_old, S)
+                main_chiplet.print_stats_console(IF, W_old, S)
                 # break
                 # print main_chiplet.cycles * defs.cycle_time + main_chiplet.stalls
                 print main_chiplet.memory.stats_accesses

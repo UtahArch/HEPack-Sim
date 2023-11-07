@@ -10,8 +10,9 @@ import defs
 import packings
 import sys
 import os
+import math
 
-console_print = False
+console_print = True
 
 if console_print:
     os.system('clear')
@@ -81,12 +82,15 @@ with open("{}.m".format(network)) as fin:
                     break
             Ct /= 2
             assert((Ct <= W[2]) and (Ct <= W[3]))
+            # Pack Faces
+            Pt = int(n_ckks/(RS*Ct*Ct))            
 
             inner_loop=0
             if console_print:
                 # print("P:{:4d}\tRS:{:4d}\tCt:{:4d}\tRS*Ct*Ct:{:4d}\t\tPF:{:}\n".format(P, RS, Ct, W[1]*W[0]*Ct*Ct, (RS*Ct*Ct)/float(n_ckks)))
-                print "IF:",(RS*Ct)/float(n_ckks), "::", "WT:",(1*Ct*Ct)/float(n_ckks)
-            assert(RS*Ct*Ct <= n_ckks)
+                # print "IF:{:.4f}\tWT:{:.4f}\tPE:{}".format((RS*Ct*Pt)/float(n_ckks), (1*Ct*Ct)/float(n_ckks), RS*Ct*Ct*Pt)
+                print (Ct*Ct)/float(n_ckks),",",
+            assert(RS*Ct*Ct*Pt <= n_ckks)
             assert(Ct != 0)
 
             # Define Classes and globals
@@ -121,7 +125,7 @@ with open("{}.m".format(network)) as fin:
 
             # Perform Channel
             # For every output feature point
-            for of in range(P):
+            for of in range(int(math.ceil(float(P)/Pt))):
 
                 # for all channel steps
                 for c_step in range(0, W[2], Ct):

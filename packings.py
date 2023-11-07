@@ -69,7 +69,7 @@ class Chiplet(elements.PE_Basic):
         print("Total Time Taken   :\t{}".format(self.cycles * defs.cycle_time + self.stalls))
         print("Automorphisms      :\t{}".format(self.autom))
         print("Permutations       :\t{}".format(self.perms))
-        print("Data Movement      :\t{}".format(self.data_movmt))
+        print("Data Movement      :\t{}".format(self.data_movmt))   # TODO: Changed! Something wrt self.data_movmt
         print("=== Chiplet Stats ===")
         # self.pe_array.print_pe_stats()
         self.wt_l2_cache.print_stats()
@@ -642,7 +642,9 @@ class Chiplet(elements.PE_Basic):
     ## Setup 
     def setup_channel_f1_f1(self):
         # Due to the complicated nature of the system, there can be no "pipelining" done
-        defs.cycle_time = 1 
+        defs.cycle_time = 0
+
+        # TODO: Needs to be updated same as f1_hyena
 
         # Multiply is going to involve just
         # a IF*WT that is going to get accumulated
@@ -685,7 +687,8 @@ class Chiplet(elements.PE_Basic):
         self.if_seq_cost = max([x[1] for x in self.if_seq])
     
     def calc_channel_pseudo(self):
-        self.autom = self.mult_pipe_counts + self.psum_pipe_counts + self.if_seq_counts
+        self.perms = self.if_seq_counts
+        self.autom = self.psum_pipe_counts
 
     # Run Hyena for all wts and ifs that are packed
     def run_channel_mult_pipe_f1_f1(self, runs):
@@ -750,23 +753,40 @@ class Chiplet(elements.PE_Basic):
 
         # PSUM Rotation is going to involve
         # KSH * PSUM
-        # PRP - Permute PSum in Eval Domain
+        # SHP - Shift
         # This is a one time cost
         self.psum_pipe = [
-            ("PRP",self.pe_array.op_permute_cycles("psum")),
+            ("PRP",self.pe_array.op_shift_cycles("psum")),
 
             ("KSH",self.pe_array.op_ksh_psum_cycles())
         ]
         self.psum_pipe_cost = sum([x[1] for x in self.psum_pipe])
 
         # IF Rotation is going to involve
-        # KSH * IF
-        # PRP - Permute IF in Eval Domain
+        # NI1   | 
+        # TR1   - F1 NTT
+        # NI2   | 
+        # SH1     -     
+        # TI1     | Permute IF  
+        # SH2     | in coeff domain
+        # TI2     -
+        # NT1   |
+        # TR2   - F1 I-NTT
+        # NT2   |
+        # KSI - KSH*IF
         # This can be pipelined
         self.if_seq = [
-            ("PRP",self.pe_array.op_permute_cycles("if")),
+            ("NI1",self.pe_array.op_ntt_f1_cycles("if")),
+            ("PR1",self.pe_array.op_permute_cycles("if")),
+            ("NI1",self.pe_array.op_ntt_f1_cycles("if")),
 
-            ("KSH",self.pe_array.op_ksh_if_cycles())
+            ("PR2",self.pe_array.op_permute_cycles("if")),
+
+            ("NT1",self.pe_array.op_ntt_f1_cycles("if")),
+            ("PR3",self.pe_array.op_permute_cycles("if")),
+            ("NT1",self.pe_array.op_ntt_f1_cycles("if")),
+            
+            ("KSH",self.pe_array.op_ksh_psum_cycles())
         ]
         self.if_seq_cost = max([x[1] for x in self.if_seq])
 
@@ -788,7 +808,7 @@ class Chiplet(elements.PE_Basic):
         self.psum_pipe_counts += runs
         self.cycles += runs * self.psum_pipe_cost
 
-        self.pe_array.op_permute('psum', runs)
+        self.pe_array.op_shift('psum', runs)
 
         self.pe_array.op_ksh_psum(runs)
 
@@ -804,7 +824,15 @@ class Chiplet(elements.PE_Basic):
         self.if_seq_counts += runs
         self.cycles += runs * self.if_seq_cost
         
-        self.pe_array.op_permute('if', runs)
+        self.pe_array.op_ntt_f1("if",runs)
+        self.pe_array.op_transpose("if",runs)
+        self.pe_array.op_ntt_f1("if",runs)
+
+        self.pe_array.op_permute("if",runs)
+
+        self.pe_array.op_ntt_f1("if",runs)
+        self.pe_array.op_transpose("if",runs)
+        self.pe_array.op_ntt_f1("if",runs)
 
         self.pe_array.op_ksh_if(runs)
 
@@ -878,7 +906,8 @@ class Chiplet(elements.PE_Basic):
         self.if_seq_cost = max([x[1] for x in self.if_seq])
     
     def calc_gala_pseudo(self):
-        self.autom = self.mult_pipe_counts + self.psum_pipe_counts + self.if_seq_counts
+        self.perms = self.if_seq_counts
+        self.autom = self.psum_pipe_counts
 
     # Run Hyena for all wts and ifs that are packed
     def run_gala_mult_pipe_f1_f1(self, runs):
@@ -954,10 +983,16 @@ class Chiplet(elements.PE_Basic):
 
         # IF Rotation is going to involve
         # KSH * IF
-        # PRP - Permute IF in Eval Domain
+        # SH1     -     
+        # TI1     | Permute IF
+        # SH2     | in Eval domain
+        # TI2     -
         # This can be pipelined
         self.if_seq = [
-            ("PRP",self.pe_array.op_permute_cycles("if")),
+            ("SH1",self.pe_array.op_shift_cycles("if")),
+            ("TI1",self.pe_array.op_transpose_cycles("if")),
+            ("SH2",self.pe_array.op_shift_cycles("if")),
+            ("TI2",self.pe_array.op_transpose_cycles("if")),
 
             ("KSH",self.pe_array.op_ksh_if_cycles())
         ]
@@ -997,7 +1032,15 @@ class Chiplet(elements.PE_Basic):
         self.if_seq_counts += runs
         self.cycles += runs * self.if_seq_cost
         
-        self.pe_array.op_permute('if', runs)
+        self.pe_array.op_ntt_f1("if",runs)
+        self.pe_array.op_transpose("if",runs)
+        self.pe_array.op_ntt_f1("if",runs)
+
+        self.pe_array.op_permute("if",runs)
+
+        self.pe_array.op_ntt_f1("if",runs)
+        self.pe_array.op_transpose("if",runs)
+        self.pe_array.op_ntt_f1("if",runs)
 
         self.pe_array.op_ksh_if(runs)
 

@@ -146,7 +146,7 @@ with open("{}.m".format(network)) as fin:
                 main_chiplet.memory.stats_accesses += int(math.ceil(main_chiplet.pe_array.wt_file.size * min(defs.max_wt_on_chiplt, W[2]/Ct * W[3]/Kt)))
                 main_chiplet.wt_l2_cache.stats_accesses += int(math.ceil(main_chiplet.pe_array.wt_file.size * min(defs.max_wt_on_chiplt, W[2]/Ct * W[3]/Kt)))
 
-                for non_over_mat in range((W[0]-1)*(W[1]-1)/(S[0]*S[1]) + 1):  # Permute to create all overlappingmatrices
+                for non_over_mat in range(min((W[0]-1)*(W[1]-1)/(S[0]*S[1])+1, P)):  # Permute to create all overlappingmatrices
 
                     iters_wt_inner = 0
 
