@@ -6,8 +6,7 @@
 ##
 #################################################################################
  
-import defs
-import packings
+import custom
 import sys
 import os
 
@@ -17,13 +16,11 @@ if console_print:
     os.system('clear')
 
 network  = sys.argv[1]
-ntttype  = sys.argv[2]
-arch     = sys.argv[3]
-poly_n   = int(sys.argv[4])*1024
-num_muls = 1
-batch    = 1
 
 done_params = set()
+
+cl = custom.CraterLake()
+num_layers = 0
 
 with open("{}.m".format(network)) as fin:
     for line in fin.readlines():
@@ -70,7 +67,7 @@ with open("{}.m".format(network)) as fin:
             P  = (IF[0] - W[0] + 1)*(IF[1] - W[1] + 1) / (S[0]*S[1])      # Total Number of Matrices
             RS = W[0]*W[1]                                   # Size of 1 Matrices
 
-            n_ckks = defs.poly_n / 2  # Polynomial Size
+            n_ckks = cl.poly_size / 2  # Polynomial Size
 
             # Pack Cts
             Ct = 1
@@ -90,23 +87,7 @@ with open("{}.m".format(network)) as fin:
             assert(RS*Ct*Ct <= n_ckks)
 
             # Define Classes and globals
-            defs.Ct = Ct
-            defs.packing = "channel"
-            defs.ntt_type = ntttype
-            defs.arch = arch
-            defs.batch_size = batch
-            defs.poly_n = poly_n
-            defs.num_chiplets = defs.poly_n / (defs.pe_size)
-
-            main_chiplet = packings.Chiplet()
-            
-            if defs.ntt_type == 'f1' and defs.arch == 'f1':
-                main_chiplet.setup_channel_f1_f1()
-            elif defs.ntt_type == 'f1' and defs.arch == 'hyena':
-                main_chiplet.setup_channel_f1_hyena()
-            else:
-                print "run_cheetah: Unkown Paramer for Setup 1", defs.ntt_type, defs.arch
-                exit()
+            cl.Ct = Ct
             
             # if console_print:
             #     continue
@@ -115,10 +96,6 @@ with open("{}.m".format(network)) as fin:
             mult_count = 0
             psum_count = 0
 
-            # Bring Values to N KSH values L2
-            main_chiplet.ksh_l2_cache.stats_accesses += main_chiplet.pe_array.ksh_file.size * defs.poly_n
-            main_chiplet.memory.stats_accesses += main_chiplet.pe_array.ksh_file.size * defs.poly_n
-
             # Perform Channel
             # For every output feature point
             for of in range(P):
@@ -126,68 +103,31 @@ with open("{}.m".format(network)) as fin:
                 # for all channel steps
                 for c_step in range(0, W[2], Ct):
 
-                    # Load IF from Memory
-                    main_chiplet.memory.stats_accesses += defs.if_file_size
-                    main_chiplet.pe_array.if_file.stats_accesses += defs.if_file_size
-
-                    # Data Movement
-                    # 1 IF
-                    main_chiplet.data_movmt += main_chiplet.pe_array.if_file.size
-
                     for iters_if in range(RS):
-                        if_count += 1
-                        # Data Movement
-                        # 1 KSH
-                        main_chiplet.data_movmt += main_chiplet.pe_array.ksh_file.size
 
-                        # Store Rotated IFs in L2 if they fit
-                        if iters_if < defs.max_if_on_chiplt:
-                            main_chiplet.if_l2_cache.stats_accesses += main_chiplet.pe_array.if_file.size
-                            iters_if += 1
-                        else:
-                            main_chiplet.memory.stats_accesses += main_chiplet.pe_array.if_file.size
+                        # Rotate IFs
+                        if_count += 1                        
                         
                     for iters_k in range(0, W[3], Ct):
                         
                         for iters_ct in range(Ct):
                             
                             for iters_mul in range(RS):
-                                # Access Rotated Ifs from L2 if they fit
-                                if iters_mul < defs.max_if_on_chiplt:
-                                    main_chiplet.if_l2_cache.stats_accesses += main_chiplet.pe_array.if_file.size
-                                    iters_if += 1
-                                else:
-                                    main_chiplet.memory.stats_accesses += main_chiplet.pe_array.if_file.size
+                                # Do Mult
                                 mult_count += 1
-                                
-                                # Data Movement
-                                # 1 IF W
-                                main_chiplet.data_movmt += main_chiplet.pe_array.if_file.size + main_chiplet.pe_array.wt_file.size
                             
+                            # Do Rotate and PSUM Accumulation
                             psum_count += 1
-                            # Data Movement
-                            # 1 KSH
-                            main_chiplet.data_movmt += main_chiplet.pe_array.ksh_file.size
+            
+            num_layers += 1
+            temp_time = cl.run_KSH(if_count, cl.curr_depth) + cl.run_MUL(mult_count, cl.curr_depth)
+            cl.curr_depth -= 1
+            temp_time += cl.run_KSH(psum_count, cl.curr_depth)
+            
+            if cl.curr_depth == 1:
+                cl.curr_depth = cl.new_depth
 
-                        # Flush PSUM to memory
-                        main_chiplet.pe_array.psum_file.stats_accesses += main_chiplet.pe_array.psum_file.size
-                        main_chiplet.memory.stats_accesses += main_chiplet.pe_array.psum_file.size
+            cl.run_time += temp_time
+            print name, temp_time
 
-            if defs.ntt_type == 'f1' and defs.arch == 'f1':
-                main_chiplet.run_channel_mult_pipe_f1_f1(mult_count)
-                main_chiplet.run_channel_psum_pipe_f1_f1(psum_count)
-                main_chiplet.run_channel_if_seq_f1_f1(if_count)
-            elif defs.ntt_type == 'f1' and defs.arch == 'hyena':
-                main_chiplet.run_channel_mult_pipe_f1_hynea(mult_count)
-                main_chiplet.run_channel_psum_pipe_f1_hynea(psum_count)
-                main_chiplet.run_channel_if_seq_f1_hynea(if_count)
-            else:
-                print "run_channel: Unkown Paramer for Run 1", defs.ntt_type, defs.arch
-                exit()
-
-            main_chiplet.calc_channel_pseudo()
-            if console_print:
-                main_chiplet.print_stats_console(IF, W, S)
-                break
-            else:
-                main_chiplet.print_stats_file(IF, W, S, name, network)
+print cl.run_time, num_layers

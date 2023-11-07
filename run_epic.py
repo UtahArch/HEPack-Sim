@@ -6,8 +6,7 @@
 ##
 #################################################################################
  
-import defs
-import packings
+import custom
 import sys
 import os
 
@@ -17,13 +16,11 @@ if console_print:
     os.system('clear')
 
 network  = sys.argv[1]
-ntttype  = sys.argv[2]
-arch     = sys.argv[3]
-poly_n   = int(sys.argv[4])*1024
-num_muls = 1
-batch    = 1
 
 done_params = set()
+
+cl = custom.CraterLake()
+num_layers = 0
 
 with open("{}.m".format(network)) as fin:
     for line in fin.readlines():
@@ -66,8 +63,7 @@ with open("{}.m".format(network)) as fin:
             Ct = 1
             XY = IF[0] * IF[1]
 
-            defs.poly_n = poly_n
-            n_ckks = defs.poly_n / 2
+            n_ckks = cl.poly_size / 2  # Polynomial Size
 
             if XY < n_ckks:
                 XtYt = XY
@@ -106,42 +102,14 @@ with open("{}.m".format(network)) as fin:
             assert(Kt*Ct*W[0]*W[1] <= n_ckks)
 
             # Define Classes
-            defs.Ct = Ct
-            defs.Kt = Kt
-            defs.packing = "epic"
-            defs.ntt_type = ntttype
-            defs.arch = arch
-            defs.batch_size = batch
-            defs.poly_n = poly_n
-            defs.num_chiplets = defs.poly_n / (defs.pe_size)
-
-            main_chiplet = packings.Chiplet()
-            if defs.ntt_type == 'f1' and defs.arch == 'f1':
-                main_chiplet.setup_epic_f1_f1()
-            elif defs.ntt_type == 'f1' and defs.arch == 'hyena':
-                main_chiplet.setup_epic_f1_hyena()
-            else:
-                print "run_epic: Unkown Paramer for Run 1", defs.ntt_type, defs.arch
-                exit()
+            cl.Ct = Ct
+            cl.Kt = Kt
             
             # if console_print:
             #     continue
 
-            # Bring Values to N KSH values L2
-            main_chiplet.ksh_l2_cache.stats_accesses += main_chiplet.pe_array.ksh_file.size * defs.poly_n
-            main_chiplet.memory.stats_accesses += main_chiplet.pe_array.ksh_file.size * defs.poly_n
-
             # Loop to finish all IFs
             for xy in range(0, XY, XtYt):
-                
-                # Store C/Ct ifs in L2, the rest will have to handled from memory
-                main_chiplet.memory.stats_accesses += main_chiplet.pe_array.if_file.size * min(defs.max_if_on_chiplt, W[2]/Ct)
-                main_chiplet.if_l2_cache.stats_accesses += main_chiplet.pe_array.if_file.size * min(defs.max_if_on_chiplt, W[2]/Ct)
-
-                # Fill the L2 cache with wts
-                # Store C/Ct x K/Kt wts in the L2, the rest will have to be handled from memory
-                main_chiplet.memory.stats_accesses += main_chiplet.pe_array.wt_file.size * min(defs.max_wt_on_chiplt, W[2]/Ct * W[3]/Kt)
-                main_chiplet.wt_l2_cache.stats_accesses += main_chiplet.pe_array.wt_file.size * min(defs.max_wt_on_chiplt, W[2]/Ct * W[3]/Kt)
                     
                 iters_wt = 0
 
@@ -152,47 +120,21 @@ with open("{}.m".format(network)) as fin:
                     
                     # Loop to finish all Channels
                     for c_step in range(0, W[2], Ct):
-                        
-                        # An IF is brought for processing and run wts are brought                        
-                        if iters_if < defs.max_if_on_chiplt:
-                            main_chiplet.if_l2_cache.stats_accesses += main_chiplet.pe_array.if_file.size
-                        else:
-                            main_chiplet.memory.stats_accesses += main_chiplet.pe_array.if_file.size
-                        main_chiplet.pe_array.if_file.stats_accesses += main_chiplet.pe_array.if_file.size
-
-                        if iters_wt < defs.max_wt_on_chiplt:
-                            main_chiplet.wt_l2_cache.stats_accesses += main_chiplet.pe_array.wt_file.size
-                        else:
-                            main_chiplet.memory.stats_accesses += main_chiplet.pe_array.wt_file.size
-                        main_chiplet.pe_array.wt_file.stats_accesses += main_chiplet.pe_array.wt_file.size
 
                         # Number of rotations = R S Ct Kt / Ct
                         inner_loop += W[1] * W[0] * Kt
                         iters_wt += 1
                         iters_if += 1
 
-                        # Data Movement
-                        # 1 IF & Wt
-                        # RSKt KSH
-                        main_chiplet.data_movmt += main_chiplet.pe_array.if_file.size + main_chiplet.pe_array.wt_file.size
-                        main_chiplet.data_movmt += main_chiplet.pe_array.ksh_file.size * (W[1]*W[0]*Kt)
-                    
-                    # Flush PSUM to memory
-                    main_chiplet.pe_array.psum_file.stats_accesses += main_chiplet.pe_array.psum_file.size
-                    main_chiplet.memory.stats_accesses += main_chiplet.pe_array.psum_file.size
+            num_layers += 1
+            temp_time = cl.run_KSH(inner_loop, cl.curr_depth) + cl.run_MUL(inner_loop, cl.curr_depth)
+            cl.curr_depth -= 1
+            temp_time += cl.run_KSH(inner_loop, cl.curr_depth)
+            
+            if cl.curr_depth == 1:
+                cl.curr_depth = cl.new_depth
 
+            cl.run_time += temp_time
+            print name, temp_time
 
-            if defs.ntt_type == 'f1' and defs.arch == 'f1':
-                main_chiplet.run_epic_f1_f1(inner_loop)
-            elif defs.ntt_type == 'f1' and defs.arch == 'hyena':
-                main_chiplet.run_epic_f1_hyena(inner_loop)
-            else:
-                print "run_epic: Unkown Paramer for Run 1", defs.ntt_type, defs.arch
-                exit()
-
-            main_chiplet.calc_epic_pseudo()
-            if console_print:
-                main_chiplet.print_stats_console(IF, W, S)
-                break
-            else:
-                main_chiplet.print_stats_file(IF, W, S, name, network)
+print cl.run_time, num_layers

@@ -13,18 +13,21 @@ Kt = None
 Ct = None
 Bt = 1
 
-packing    = "cheetah"
-ntt_type   = "baseline"
+packing    = "channel"
+ntt_type   = "f1"
 arch       = "f1"
-poly_n     = 1024
+poly_n     = ????
 batch_size = 1
-num_chiplets  = None
 
 # Arch Choices
-pe_size        = 1024
-transpose_f1    = 32     # Rotation for n = 1024
+pe_values       = 256
+pe_residues     = 60
+num_pes         = 8
+num_steps       = 32
+
+
+transpose_f1    = 32     # Rotation for n = ???
 shift_f1        = 1
-permute_hyena   = 1      # Benes network FTW!
 
 # Processor
 cycle_time = None     # In Ticks
@@ -33,16 +36,16 @@ tick_time  = 1        # In ns
 # PE
 
 ## MACs
-mac_num         = poly_n*2
+mac_num         = *2
 mul_exec_time   = 5     # In Ticks
 add_exec_time   = 0     
 
 ## L1 Caches
-if_file_size    = poly_n*2   # Num of 8 b registers / cache blocks
+if_file_size    = *2   # Num of 8 b registers / cache blocks
 if_file_read    = 0
 if_file_write   = 0
 
-wt_file_size    = poly_n     # Num of 8 b registers / cache blocks
+wt_file_size    =      # Num of 8 b registers / cache blocks
 wt_file_read    = 0
 wt_file_write   = 0
 
