@@ -104,12 +104,21 @@ class PE(elements.PE_Basic):
     
     # Rotate Psums after muls and send last B and recieve new 1st B
     # This stage is what requires op_mul_psum_ksh to happen
-    def op_psum_rotate_cycles(self, iters=1):        
-        return defs.rotation * iters
 
-    def op_psum_rotate(self, iters=1):
-        self.update_psum_rotate(iters)
-        self.rot_stats.update_psum_rotate(iters)
+    # For F1 NTT F1 Arch
+    def op_psum_transpose_cycles(self):        
+        return defs.transpose_f1
+
+    def op_psum_transpose(self):
+        self.update_psum_transpose()
+        self.rot_stats.update_psum_transpose()
+
+    def op_psum_shift_cycles(self):        
+        return defs.shift_f1
+
+    def op_psum_shift(self):
+        self.update_psum_shift()
+        self.rot_stats.update_psum_shift()
 
     
     # Rotate Wts after having used them in muls
@@ -217,25 +226,25 @@ class PE(elements.PE_Basic):
         self.op_ntt_baseline(mode, int(math.sqrt(defs.poly_n)))
         
 
-    # Run optimised NTT
-    # For 1 shift : f(x) * NTT(x) + c1
-    #               reg     HardCoded 
-    # For stride this is going to repeat stride times
-    def op_ntt_opt_cycles(self, mode, stride=1):
+    # # Run optimised NTT
+    # # For 1 shift : f(x) * NTT(x) + c1
+    # #               reg     HardCoded 
+    # # For stride this is going to repeat stride times
+    # def op_ntt_opt_cycles(self, mode, stride=1):
 
-        if mode == 'psum':
-            reg_file = self.psum_file
-        elif mode == 'wt':
-            reg_file = self.wt_file
-        elif mode == 'if':
-            reg_file = self.if_file
-        else:
-            print "Error op_ntt_opt 1"
-            exit()
+    #     if mode == 'psum':
+    #         reg_file = self.psum_file
+    #     elif mode == 'wt':
+    #         reg_file = self.wt_file
+    #     elif mode == 'if':
+    #         reg_file = self.if_file
+    #     else:
+    #         print "Error op_ntt_opt 1"
+    #         exit()
         
-        # Read from regfile at the start and write to it in the end, therefore it does not come into the picture
-        return (self.muls.exec_time + self.adds.exec_time) * stride + reg_file.read_time
+    #     # Read from regfile at the start and write to it in the end, therefore it does not come into the picture
+    #     return (self.muls.exec_time + self.adds.exec_time) * stride + reg_file.read_time
     
-    def op_ntt_opt(self, mode, stride=1):
-        self.update_ntt_opt(mode, stride)
-        self.ntt_stats.update_ntt_opt(mode, stride)
+    # def op_ntt_opt(self, mode, stride=1):
+    #     self.update_ntt_opt(mode, stride)
+    #     self.ntt_stats.update_ntt_opt(mode, stride)

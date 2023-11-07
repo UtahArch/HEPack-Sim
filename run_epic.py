@@ -37,9 +37,10 @@ with open("{}.m".format(network)) as fin:
         elif "Dimensions" in line:
             param = {}
             if console_print:
-                # line = "Dimensions { K: 24, C: 96, R: 1, S: 1, Y:56, X:56 }"
-                line = 'Dimensions { K: 1, C: 96, R: 3, S: 3, Y:56, X:56 }'
+                line = "Dimensions { K: 24, C: 96, R: 1, S: 1, Y:56, X:56 }"
+                # line = 'Dimensions { K: 1, C: 96, R: 3, S: 3, Y:56, X:56 }'
                 # line = "Dimensions { K: 512, C: 512, R: 3, S: 3, Y: 7, X: 7 }"
+                # line = "Dimensions { K: 1, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
                 # line = "Dimensions { K: 64, C: 256, R: 1, S: 1, Y: 56, X: 56 }"
 
             # if line in done_params:
@@ -54,8 +55,8 @@ with open("{}.m".format(network)) as fin:
             if console_print:
                 print name, param
 
-            IF = (param['X'], param['Y'], param['C'])
-            W  = (param['R'], param['S'], param['C'], param['K'])
+            IF = (2*param['X'], param['Y'], param['C'])
+            W  = (2*param['R'], param['S'], param['C'], param['K'])
 
             # To decide C_t and XY_t - IF Packing
             C_t = 1

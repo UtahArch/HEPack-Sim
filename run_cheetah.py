@@ -53,8 +53,8 @@ with open("{}.m".format(network)) as fin:
             if console_print:
                 print name, param
 
-            IF = (param['X'], param['Y'], param['C'])
-            W  = (param['R'], param['S'], param['C'], param['K'])
+            IF = (2*param['X'], param['Y'], param['C'])
+            W  = (2*param['R'], param['S'], param['C'], param['K'])
             
             # Decide Params
             ## To decide C_t and XY_t - IF packing
