@@ -1,7 +1,47 @@
 # ML-HE Simulator
 
+TODO: Need a description of F1 vs Hyena architecture and that we did not write about F1 architecture in the paper?
 
 ## Using the Simulator
+
+To run a specific packing method, refer to the `USAGE:` mentioned in the python script. For example to run the simulation for hyena packing on F1 architecture and using F1 NTT you would do:
+
+```bash
+python run_hyena.py resnet f1 f1 1
+```
+
+To reproduce the results presented in the paper it is important to not change any values in the python files and interface with them using the command line options. The `console_print` and other commented lines of code can be used to debug experiments. An example `run_all.sh` to run experiments would be:
+
+```bash
+# Single Input Runs
+for network in mobile resnet gnmt resnet20
+do
+    python run_ngraph.py ${network} 1 1 &
+    for pack in hyena epic cheetah channel
+    do
+        for n in 1
+        do
+            python run_${pack}.py ${network} f1 f1 ${n} &
+            python run_${pack}.py ${network} f1 hyena ${n} &
+        done    
+    done
+    wait
+done
+wait
+
+# Batching Runs
+for network in resnet
+do
+    for batch in 1 8 64 512
+    do
+        python run_ngraphplus.py ${network} ${batch} 1 &
+        python run_ngraph.py     ${network} ${batch} 1 &
+        python run_hyenaplus.py  ${network} f1 hyena 1 ${batch} &
+    done
+    # wait
+done
+wait
+```
 
 ## About the Codebase
 
@@ -21,7 +61,7 @@ Different packings implemented:
 - run_hyena.py  : Packing discussed in [Hyena: Balancing Packing, Reuse, and Rotations for Encrypted Inference (yet to appear in SP'24)]()
 - run_lion.py   : Packing as described in [Cheetah: Lean and Fast Secure Two-Party Deep Neural Network Inference](https://www.usenix.org/conference/usenixsecurity22/presentation/huang-zhicong)
 - run_ngraph.py : Packing as described in [nGraph-HE: a graph compiler for deep learning on homomorphically encrypted data](https://dl.acm.org/doi/abs/10.1145/3310273.3323047)
-- run_<packing>plus.py : Packing with smart batching
+- run_\<packing\>plus.py : Packing with smart batching
 
 ### Scripts
 
@@ -32,4 +72,15 @@ Different packings implemented:
 
 ### Workloads
 
-Parameters for the neural networks have been obtained from [Maestro](All definitions for the different structures in the Engine and the basic) (for ...) while resnet20 ... .
+Parameters for the neural networks have been obtained from [Maestro](https://github.com/maestro-project/maestro/tree/master/data/model) (Resnet50, MobileNetV2, gnmt) while the resnet20 parameters are based on [Privacy-Preserving Machine Learning with Fully Homomorphic Encryption for Deep Neural Network](https://arxiv.org/abs/2106.07229).
+
+
+### Adding Functionality
+
+To add new functionality you would have to:
+
+1. Add any new functional units to `funcs.py` and their associated hardware and stat collection code to `elements.py`.
+2. Update `defs.py` with any new parameters.
+3. Define a pipeline structre in `packings.py`.
+4. Add any new mode parameters in format that is similar to `resnet.m`
+5. Add a new file based on the other `run_<packing>.py` scripts to parse the input, calculate packing parameters and perform the dataflow.
