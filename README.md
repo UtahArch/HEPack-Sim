@@ -47,7 +47,7 @@ wait
 
 ### Simulation
 
-- defs.py: Defines architectural and secutrity parameters used for the simulation.
+- defs.py: Defines architectural and security parameters used for the simulation.
 - elements.py: All definitions for the hardware structures (Multiplier, Caches, etc) and their stat collection.
 - funcs.py: All definitions for the different Functional Units (ModMult, NTT, Automorph, etc) used by the workloads.
 - packings.py: All definitions for the different packings and pipelines implemented.
