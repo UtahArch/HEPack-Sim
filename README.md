@@ -1,6 +1,6 @@
-# ML-HE Simulator
+# HEPack Simulator
 
-TODO: Need a description of F1 vs Hyena architecture and that we did not write about F1 architecture in the paper?
+HEPack-Sim is an open-source tool for modeling and evaluating the performance and energy efficiency of performing Homomorphic Encryption based Machine Learning inference tasks on an accelerator. HEPack-Sim is built to evaluate a range of data packing, dataflow designs, and accelerator parameters.  HEPack-Sim was developed by the [Utah Arch Research Group](https://arch.cs.utah.edu/) at the [Kahlert School of Computing, University of Utah](https://www.cs.utah.edu/), to explore novel techniques to optimize private inference and demonstrate reproducibility of results presented in the work [Hyena: Balancing Packing, Reuse, and Rotations for Encrypted Inference (yet to appear in SP'24)](). 
 
 ## Using the Simulator
 
@@ -84,3 +84,11 @@ To add new functionality you would have to:
 3. Define a pipeline structre in `packings.py`.
 4. Add any new mode parameters in format that is similar to `resnet.m`
 5. Add a new file based on the other `run_<packing>.py` scripts to parse the input, calculate packing parameters and perform the dataflow.
+
+## License
+
+HEPack-Sim is released under the [MIT License](LICENSE).
+
+## Contact
+
+For questions or further information, please contact the [Utah Arch Research Group](https://arch.cs.utah.edu/).
