@@ -54,13 +54,13 @@ wait
 
 Different packings implemented:
 
-- run_channel.py: Channel Packing as defined in [GAZELLE: A Low Latency Framework for Secure Neural Network Inference](https://www.usenix.org/conference/usenixsecurity18/presentation/juvekar)
-- run_cheetah.py: Cheetah Packing as defined in [Low Latency Privacy Preserving Inference](https://arxiv.org/abs/1812.10659)
-- run_epic.py   : Packing as described in [EPIC: Efficient Packing for Inference using Cheetah](https://sarabjeetsingh007.github.io/files/cogarch22.pdf)
-- run_gala.py   : Packing as described in [GALA: Greedy ComputAtion for Linear Algebra in Privacy-Preserved Neural Networks](https://arxiv.org/abs/2105.01827)
-- run_hyena.py  : Packing discussed in [Hyena: Balancing Packing, Reuse, and Rotations for Encrypted Inference (yet to appear in SP'24)]()
-- run_lion.py   : Packing as described in [Cheetah: Lean and Fast Secure Two-Party Deep Neural Network Inference](https://www.usenix.org/conference/usenixsecurity22/presentation/huang-zhicong)
-- run_ngraph.py : Packing as described in [nGraph-HE: a graph compiler for deep learning on homomorphically encrypted data](https://dl.acm.org/doi/abs/10.1145/3310273.3323047)
+- run_channel.py: (Ch-Pack) Channel Packing as defined in [GAZELLE: A Low Latency Framework for Secure Neural Network Inference](https://www.usenix.org/conference/usenixsecurity18/presentation/juvekar)
+- run_cheetah.py: (LoLa-Pack) Cheetah Packing as defined in [Low Latency Privacy Preserving Inference](https://arxiv.org/abs/1812.10659)
+- run_epic.py   : (A+W-Pack) Packing as described in [EPIC: Efficient Packing for Inference using Cheetah](https://sarabjeetsingh007.github.io/files/cogarch22.pdf)
+- run_gala.py   : (Ga-Pack) Packing as described in [GALA: Greedy ComputAtion for Linear Algebra in Privacy-Preserved Neural Networks](https://arxiv.org/abs/2105.01827)
+- run_hyena.py  : (Hyena-Pack) Packing discussed in [Hyena: Balancing Packing, Reuse, and Rotations for Encrypted Inference (yet to appear in SP'24)]()
+- run_lion.py   : (C2PC-Pack) Packing as described in [Cheetah: Lean and Fast Secure Two-Party Deep Neural Network Inference](https://www.usenix.org/conference/usenixsecurity22/presentation/huang-zhicong)
+- run_ngraph.py : (BatchWise-Pack) Packing as described in [nGraph-HE: a graph compiler for deep learning on homomorphically encrypted data](https://dl.acm.org/doi/abs/10.1145/3310273.3323047)
 - run_\<packing\>plus.py : Packing with smart batching
 
 ### Scripts
