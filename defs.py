@@ -1,8 +1,11 @@
 #################################################################################
 ##   Defines architectural and secutrity parameters used for the simulation
 ##   Change packing, ntt_type, arch to vary the simulation runs
-##   Our architecture and assumptions are better described in the paper "Hyena: Balancing Packing, Reuse, and Rotations for Encrypted Inference"
-##  
+##   Our architecture and assumptions are better described in the paper 
+##   
+##   These are the default parameters used by the runs, it is recommended to change
+##   them in the run_<packing>.py rather than here
+##
 ##   TODO: Remove Legacy Parameters
 #################################################################################
 
@@ -13,15 +16,16 @@ Kt = None
 Ct = None
 Bt = 1
 
+# Parameters used for naming the file
 packing    = "cheetah"      # Packing Scheme
-ntt_type   = "baseline"     # NTT Type
-arch       = "f1"           # Accelerator Hardware
+ntt_type   = "baseline"     # NTT Type: baseline, f1
+arch       = "f1"           # Accelerator Hardware: f1, hyena
 poly_n     = 1024
 batch_size = 1
 num_chiplets  = None
 
 # Arch Choices
-pe_size        = 1024
+pe_size        = 1024    # Number of PEs per accelerator
 transpose_f1    = 32     # Rotation for n = 1024 in ticks
 shift_f1        = 1      # In ticks
 permute_hyena   = 1      # Benes network FTW, in ticks
@@ -37,7 +41,7 @@ mac_num         = poly_n*2  # Since CKKS is complex
 mul_exec_time   = 5         # In Ticks
 add_exec_time   = 0         # Since we use MAC units Add is free
 
-## L1 Caches                 # These are techinically registers inside MAC units so reads and writes are immediate
+## L1 Caches                 # These are techinically registers inside MAC units so reads are immediate, writes are hidden behind the pipeline
 if_file_size    = poly_n*2   # Num of 8 b registers / cache blocks
 if_file_read    = 0          
 if_file_write   = 0
