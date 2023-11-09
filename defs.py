@@ -1,5 +1,5 @@
 #################################################################################
-##   Defines architectural and secutrity parameters used for the simulation
+##   Defines architectural and security parameters used for the simulation
 ##   Change packing, ntt_type, arch to vary the simulation runs
 ##   Our architecture and assumptions are better described in the paper 
 ##   
