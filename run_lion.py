@@ -114,7 +114,8 @@ with open("{}.m".format(network)) as fin:
             defs.poly_n = poly_n
 
             main_chiplet = packings.Chiplet()
-            
+
+            # Cycle Time is constrained by the memory bandwidth - for more information please refer to the paper
             main_chiplet.setup_lion(30)
 
             # Bring Values to N KSH values L2
