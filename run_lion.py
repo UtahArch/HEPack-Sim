@@ -116,7 +116,8 @@ with open("{}.m".format(network)) as fin:
             main_chiplet = packings.Chiplet()
 
             # Cycle Time is constrained by the memory bandwidth - for more information please refer to the paper
-            main_chiplet.setup_lion(30)
+            # Since accesses are regular, the HBM2 per pin access latency is considered as a constant, and is calculated as 1kB/(64GB/s bandwidth), where 1kB is the size of weight polynomial that is accessed
+            main_chiplet.setup_lion(15)
 
             # Bring Values to N KSH values L2
             main_chiplet.ksh_l2_cache.stats_accesses += main_chiplet.pe_array.ksh_file.size * defs.poly_n
